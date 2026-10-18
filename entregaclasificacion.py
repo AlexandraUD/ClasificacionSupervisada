@@ -41,6 +41,7 @@ import os
 import re
 import shutil
 import sys
+import textwrap
 import urllib.request
 from zipfile import ZipFile
 
@@ -53,6 +54,7 @@ import seaborn as sns
 from matplotlib.colors import Normalize
 from matplotlib.patches import Patch
 from rasterio.enums import Resampling
+from rasterio.features import shapes
 from rasterio.mask import mask
 from rasterio.windows import from_bounds
 from sklearn.ensemble import RandomForestClassifier
@@ -63,6 +65,7 @@ from sklearn.model_selection import cross_val_score, train_test_split
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import RobustScaler
+from shapely.geometry import shape
 
 # =============================================================================
 # CONFIGURACIÓN  (lo único que normalmente hay que tocar)
@@ -333,9 +336,12 @@ def evaluar(modelo, X, y, dict_clases, titulo, nombre_png):
     nombres = [dict_clases.get(e, str(e)) for e in etiquetas]
 
     m = confusion_matrix(y, y_pred, labels=etiquetas)
-    disp = ConfusionMatrixDisplay(confusion_matrix=m, display_labels=nombres)
-    disp.plot(cmap="Greens", xticks_rotation=45)
-    plt.title(f"Matriz de confusión - {titulo}")
+    nombres_cortos = [textwrap.fill(n, 14) for n in nombres]  # evita que las etiquetas se pisen
+    fig, ax = plt.subplots(figsize=(10, 9))
+    disp = ConfusionMatrixDisplay(confusion_matrix=m, display_labels=nombres_cortos)
+    disp.plot(ax=ax, cmap="Greens", xticks_rotation=45)
+    plt.setp(ax.get_xticklabels(), ha="right", rotation_mode="anchor")
+    ax.set_title(f"Matriz de confusión - {titulo}")
     guardar_figura(nombre_png)
 
     print(f"\n----- {titulo} -----")
@@ -381,6 +387,13 @@ def clasificar_imagen(modelo, ruta_tif, salida_tif, dict_clases, titulo, nombre_
     with rasterio.open(salida_tif, "w", **meta) as dst:
         dst.write(np.expand_dims(pred, axis=0))
     print(f"  Guardado: {salida_tif}")
+
+    # También como vector GeoPackage (polígonos por clase) para abrir en QGIS
+    filas = [{"Clase": int(v), "DESC": dict_clases.get(int(v), str(int(v))), "geometry": shape(g)}
+             for g, v in shapes(pred, mask=(pred != NODATA_CLASIF), transform=meta["transform"])]
+    salida_gpkg = os.path.splitext(salida_tif)[0] + ".gpkg"
+    gpd.GeoDataFrame(filas, geometry="geometry", crs=meta["crs"]).to_file(salida_gpkg, driver="GPKG")
+    print(f"  Guardado: {salida_gpkg}")
 
 
 # =============================================================================
