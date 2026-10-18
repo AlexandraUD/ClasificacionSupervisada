@@ -51,7 +51,7 @@ import numpy as np
 import pandas as pd
 import rasterio
 import seaborn as sns
-from matplotlib.colors import Normalize
+from matplotlib.colors import ListedColormap
 from matplotlib.patches import Patch
 from rasterio.enums import Resampling
 from rasterio.features import shapes
@@ -107,6 +107,18 @@ NODATA_CLASIF = np.iinfo(np.uint16).max  # nodata del mapa clasificado (65535)
 SEMILLA = 42
 
 SALIDAS = os.path.join(CARPETA, "salidas")
+
+# Colores por clase (tomados de simblogia.qml, la simbología de QGIS), indexados por DESC
+COLORES_DESC = {
+    "Bosques y montes": "#269E08",
+    "Construcciones": "#CC0A17",
+    "Cuerpos de agua": "#2482D5",
+    "Cultivos y parcelas": "#EDEA24",
+    "Vegetacion herbacea descubierta": "#4CF12B",
+    "Tierras eriales": "#4A131D",
+    "Nube": "#FFFFFF",
+}
+COLORES_CLASE = {}  # se completa en main() con asignar_colores()
 
 
 # =============================================================================
@@ -286,9 +298,15 @@ def dict_de_clases(*dataframes):
     return dict(sorted(clases.items()))
 
 
+def asignar_colores(dict_clases):
+    """Asigna a cada código de clase el color de QGIS según su DESC (o un color tab10 si no está)."""
+    for clase, desc in dict_clases.items():
+        COLORES_CLASE[clase] = COLORES_DESC.get(desc, plt.cm.tab10(clase % 10))
+
+
 def color_clase(clase):
-    """Color de una clase (mismo que usa el mapa clasificado con cmap='tab10')."""
-    return plt.cm.tab10(Normalize(0, 9)(clase))
+    """Color de una clase (el mismo de la simbología de QGIS)."""
+    return COLORES_CLASE.get(clase, plt.cm.tab10(clase % 10))
 
 
 def graficar_firmas_espectrales(df, dict_clases, nombre_png):
@@ -321,7 +339,12 @@ def graficar_recorte_con_poligonos(ruta_tif, poligonos, titulo, nombre_png):
     ax.imshow(esc[:, :, [3, 2, 1]], extent=[left, right, bottom, top], origin="upper")
     ax.ticklabel_format(style="plain", axis="both")
     if poligonos is not None:
-        poligonos.plot(ax=ax, facecolor="none", column="DESC", linewidth=2, legend=True)
+        for clase in sorted(poligonos["Clase"].unique()):
+            sub = poligonos[poligonos["Clase"] == clase]
+            sub.plot(ax=ax, facecolor="none", edgecolor=color_clase(int(clase)), linewidth=2)
+        ax.legend(handles=[Patch(facecolor="none", edgecolor=color_clase(int(c)),
+                                 label=poligonos.loc[poligonos["Clase"] == c, "DESC"].iloc[0])
+                           for c in sorted(poligonos["Clase"].unique())], loc="upper right")
     ax.set_title(titulo)
     guardar_figura(nombre_png)
 
@@ -373,7 +396,9 @@ def clasificar_imagen(modelo, ruta_tif, salida_tif, dict_clases, titulo, nombre_
 
     # Gráfico con leyenda
     fig, ax = plt.subplots(figsize=(10, 10))
-    ax.imshow(np.ma.masked_equal(pred, NODATA_CLASIF), cmap="tab10", vmin=0, vmax=9,
+    n_cl = max(int(c) for c in dict_clases) + 1
+    cmap = ListedColormap([color_clase(i) for i in range(n_cl)])
+    ax.imshow(np.ma.masked_equal(pred, NODATA_CLASIF), cmap=cmap, vmin=0, vmax=max(n_cl - 1, 1),
               interpolation="nearest")
     presentes = [int(c) for c in np.unique(pred) if c != NODATA_CLASIF]
     ax.legend(handles=[Patch(color=color_clase(c), label=dict_clases.get(c, str(c)))
@@ -521,6 +546,7 @@ def main():
 
     dict_clases = dict_de_clases(muestras1, muestras2)
     print("Clases:", dict_clases)
+    asignar_colores(dict_clases)
     solo_en_1 = set(muestras1["Clase"]) - set(muestras2["Clase"])
     solo_en_2 = set(muestras2["Clase"]) - set(muestras1["Clase"])
     if solo_en_1:
@@ -538,7 +564,8 @@ def main():
     graficar_firmas_espectrales(muestras1, dict_clases, "firmas_espectrales_recorte1.png")
     # Dispersión entre pares de bandas (Notebook 03a); se usa una submuestra para que sea rápido
     sub = muestras1[COLUMNAS_BANDAS + ["DESC"]].sample(min(3000, len(muestras1)), random_state=SEMILLA)
-    sns.pairplot(sub, hue="DESC", plot_kws={"alpha": 0.4, "s": 10})
+    paleta = {desc: color_clase(c) for c, desc in dict_clases.items()}
+    sns.pairplot(sub, hue="DESC", palette=paleta, plot_kws={"alpha": 0.4, "s": 10})
     guardar_figura("pairplot_recorte1.png")
 
     graficar_recorte_con_poligonos(tif1, pols1, "Recorte 1 con polígonos de muestras",
