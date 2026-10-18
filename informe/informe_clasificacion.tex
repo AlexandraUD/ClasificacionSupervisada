@@ -1,0 +1,1044 @@
+\documentclass[11pt,letterpaper]{article}
+
+% --- PAQUETES DE DISEÑO ---
+\usepackage[utf8]{inputenc}
+% es-nodecimaldot evita el conflicto de babel-español con siunitx
+\usepackage[spanish, es-tabla, es-nodecimaldot]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage{xurl}          % corta las URLs largas para que no se salgan del margen
+\usepackage{listings}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\usepackage{subcaption}
+\usepackage[authoryear,round]{natbib}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc}
+\usepackage{adjustbox}
+\geometry{top=2cm, bottom=2.5cm, left=2.2cm, right=2.2cm}
+% Evita que identificadores largos en \texttt se salgan del margen.
+\emergencystretch=2.5em
+
+% --- COLORES ---
+\usepackage{xcolor}
+\definecolor{mainBlue}{RGB}{0, 32, 96}
+\definecolor{lightGray}{RGB}{240, 240, 240}
+
+% --- TÍTULOS Y SECCIONES ---
+\usepackage{titlesec}
+\titleformat{\section}{\large\bfseries\color{mainBlue}}{\thesection.}{0.5em}{}[\titlerule]
+
+% --- CAJAS Y CÓDIGO ---
+\usepackage{tcolorbox}
+
+\lstset{
+    basicstyle=\ttfamily\footnotesize,
+    backgroundcolor=\color{lightGray!50},
+    frame=single,
+    rulecolor=\color{mainBlue!20},
+    columns=fullflexible,
+    breaklines=true,
+    breakatwhitespace=true,
+    showstringspaces=false,
+    xleftmargin=10pt,
+    xrightmargin=6pt,
+    inputencoding=utf8,
+    extendedchars=true,
+    literate={á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1 {ñ}{{\~n}}1,
+}
+
+\newtcolorbox{analisisBox}[1]{
+    colback=lightGray!30, colframe=mainBlue, fonttitle=\bfseries,
+    title=#1, arc=0pt, outer arc=0pt, width=\linewidth,
+    left=4pt, right=4pt
+}
+
+% siunitx: separador de miles con espacio fino, coma decimal
+\sisetup{group-separator={\,}, output-decimal-marker={,}, group-minimum-digits=4, group-digits=integer}
+
+\hypersetup{colorlinks=true, linkcolor=mainBlue, urlcolor=mainBlue, citecolor=mainBlue,
+            breaklinks=true}
+
+% --- INICIO DEL DOCUMENTO ---
+\begin{document}
+% babel-spanish activa "<" y ">" como atajos para comillas latinas;
+% eso choca con listings y con la sintaxis >={...} de TikZ.
+\shorthandoff{<>"}
+
+% --- ENCABEZADO COMPACTO ---
+\begin{center}
+    {\color{mainBlue}\hrule height 1.5pt}
+    \vspace{0.4cm}
+    {\Large \textbf{\texttt{Procesamiento Digital de Imágenes Satelitales y Datos Geoespaciales con Python}}}\\
+    \vspace{0.4cm}
+    Entrega Clasificación Supervisada\\
+    \vspace{0.4cm}
+    {\large \textit{Campus Virtual del Instituto de Altos Estudios Espaciales Mario Gulich}}\\
+    \vspace{0.4cm}
+    {\color{mainBlue!30}\hrule height 0.8pt}
+    \vspace{0.2cm}
+
+    \begin{tabular}{cc}
+        \textbf{Autor 1} \\[0.2cm]
+        Argenis Alexandra Daza Roa \\[0.1cm]
+        \footnotesize \texttt{aadazar@udistrital.edu.co}
+    \end{tabular}
+
+    \vspace{0.5cm}
+    \small \textbf{Fecha:} \today
+    \vspace{0.2cm}
+    {\color{mainBlue}\hrule height 1.5pt}
+\end{center}
+
+\begin{abstract}
+\noindent
+En este trabajo se clasificó la cobertura de la tierra de una escena Sentinel-2 L2A del 9 de enero de 2025
+(tesela T19NBH) en el departamento de Arauca, Colombia. Se usaron las bandas B02, B03, B04, B08, B11 y B12
+a 10~m y seis clases del primer nivel del sistema CIAF: construcciones, cultivos y parcelas, vegetación herbácea
+descubierta, bosques y montes, cuerpos de agua y tierras eriales. Las muestras se digitalizaron en QGIS sobre
+dos recortes de $5\times5$~km. Con ellas se entrenó un Random Forest, se buscó la profundidad máxima por
+validación cruzada y, a modo de comparación, se probó un KNN. Sobre el recorte de entrenamiento la exactitud
+global fue de \num{0.979} ($\kappa=\num{0.972}$). Al validar con el segundo recorte, que tiene muestras
+independientes, bajó a \num{0.668} ($\kappa=\num{0.531}$). La diferencia se explica sobre todo por tres cosas:
+los suelos descubiertos y brillantes (playones, parcelas aradas) terminan clasificados como construcción, los
+cultivos se confunden con la vegetación herbácea, y en el segundo recorte hay nubes y sombras que no hacían
+parte del entrenamiento. Al final se plantean los ajustes para una segunda clasificación.
+\end{abstract}
+
+\tableofcontents
+\vspace{0.6cm}
+
+% =====================================================================
+\section{Introducción}
+% =====================================================================
+
+Conocer cómo está cubierto el territorio (dónde hay bosque, dónde se cultiva, por dónde corre el agua, qué
+tanto ha crecido lo urbano) es la base para casi cualquier decisión de ordenamiento o de gestión ambiental.
+Hacer ese levantamiento en campo es costoso y lento, por eso desde hace décadas se recurre a las imágenes
+satelitales. Cada tipo de superficie refleja la energía de una manera distinta a lo largo del espectro
+electromagnético, y esa \emph{firma espectral} es la que permite separarlas de forma automática
+\citep{chuvieco2010}.
+
+La clasificación supervisada aprovecha justamente eso: a partir de un conjunto de píxeles de los que ya se
+conoce la clase (las muestras de entrenamiento), un algoritmo aprende a asignar una clase al resto de la
+imagen \citep{gulich}. Uno de los algoritmos más usados en teledetección es Random Forest, que combina
+muchos árboles de decisión y suele dar buenos resultados sin necesidad de normalizar los datos
+\citep{breiman2001}.
+
+Para este trabajo se eligió una escena Sentinel-2 sobre el departamento de Arauca, en la Orinoquía colombiana.
+Es una zona de sabanas inundables, bosques de galería, ríos con meandros, potreros y parcelas agrícolas, con el
+casco urbano de Arauca sobre el río del mismo nombre. Esa mezcla la hace interesante para clasificar, pero
+también difícil, porque varias coberturas tienen respuestas espectrales parecidas. El flujo de trabajo sigue
+las Notebooks 02c, 03a y 03b del curso: lectura de las bandas, generación de muestras, entrenamiento,
+evaluación y, como segunda instancia de validación, la aplicación del modelo sobre un recorte distinto con
+muestras propias (apartado ``Yapa'' de la Notebook 03b).
+
+% =====================================================================
+\section{Objetivos}
+% =====================================================================
+\subsection{Objetivo general}
+Clasificar las coberturas de la tierra de dos sectores del departamento de Arauca a partir de una imagen
+Sentinel-2 L2A, usando aprendizaje supervisado en Python, y evaluar qué tan bien se comporta el modelo
+cuando se aplica a una zona distinta de aquella en la que fue entrenado.
+
+\subsection{Objetivos específicos}
+\begin{itemize}
+    \item Leer las bandas B02, B03, B04, B08, B11 y B12 directamente desde el archivo \texttt{.SAFE.zip},
+    remuestrear las de 20~m a 10~m y generar dos recortes de $5\times5$~km.
+    \item Definir las clases a partir del primer nivel del sistema CIAF y digitalizar en QGIS las muestras
+    de entrenamiento y de validación.
+    \item Analizar la separabilidad de las clases mediante sus firmas espectrales y gráficos de dispersión.
+    \item Entrenar un clasificador Random Forest, ajustar su profundidad máxima por validación cruzada y
+    compararlo con KNN.
+    \item Evaluar los modelos con la matriz de confusión, la precisión, el \emph{recall}, el F1, la
+    exactitud global y el índice kappa, tanto en el recorte de entrenamiento como en el de validación.
+    \item Generar los mapas clasificados como GeoTIFF y GeoPackage, e identificar las principales fuentes de
+    error para plantear una segunda clasificación.
+\end{itemize}
+
+% =====================================================================
+\section{Marco conceptual}
+\label{sec:marco}
+% =====================================================================
+
+\subsection{Imágenes satelitales y firmas espectrales}
+Una imagen satelital es una medición por teledetección: un instrumento a bordo del satélite registra la
+energía reflejada o emitida por la superficie en determinadas regiones del espectro electromagnético, y
+cada píxel queda localizado geográficamente \citep{gulich}. Los sensores multiespectrales no miden el
+espectro completo, sino ``recortes'' de él, que se conocen como bandas espectrales.
+
+La \textbf{firma espectral} es la variación de la reflectancia de un material en función de la longitud de
+onda \citep{chuvieco2010}. Las firmas de las coberturas que aparecen en este trabajo tienen rasgos
+bastante conocidos \citep{gulich}:
+
+\begin{itemize}
+    \item \textbf{Vegetación sana:} refleja poco en el visible, salvo un pequeño pico en el verde, porque la
+    clorofila absorbe el azul y el rojo. En el infrarrojo cercano (NIR) refleja mucho por la estructura
+    interna de las hojas. En el infrarrojo de onda corta (SWIR) la reflectancia depende sobre todo del
+    contenido de agua: la vegetación seca refleja más.
+    \item \textbf{Agua:} el agua limpia refleja algo en el azul y absorbe con fuerza en el NIR y el SWIR,
+    por eso se ve oscura en esas bandas. Cuando trae sedimentos o materia orgánica, como los ríos de la
+    Orinoquía, su reflectancia en el visible sube y la diferencia con el suelo húmedo se hace menor.
+    \item \textbf{Suelo:} en general su reflectancia aumenta con la longitud de onda, aunque depende de la
+    humedad, la materia orgánica, la textura y los minerales. El suelo seco y arenoso refleja mucho en todo
+    el espectro, mientras que el suelo húmedo absorbe más en el NIR y el SWIR.
+\end{itemize}
+
+Para la interpretación visual se usan composiciones RGB. Además del color natural (B04-B03-B02), en este
+trabajo fue muy útil el \textbf{falso color de vegetación} (B08-B04-B03). Ahí la vegetación vigorosa
+aparece en rojo, el agua en tonos oscuros o azules, y las superficies construidas y los suelos descubiertos
+en tonos cian o grisáceos.
+
+\subsection{La misión Sentinel-2}
+Sentinel-2 es una misión del programa Copernicus de la Agencia Espacial Europea (ESA). Lleva el instrumento
+multiespectral MSI, con 13 bandas entre el visible y el SWIR y resoluciones de 10, 20 y 60~m
+\citep{drusch2012,esa2015}. El producto \textbf{L2A} viene corregido atmosféricamente y expresa los
+valores en reflectancia de superficie (BOA), por lo que es el más adecuado para clasificar. Se distribuye
+en teselas de $100\times100$~km y formato JPEG2000. Dentro de la carpeta \texttt{GRANULE/.../IMG\_DATA}
+las bandas se agrupan en \texttt{R10m}, \texttt{R20m} y \texttt{R60m} según su resolución.
+
+\begin{table}[H]
+\centering
+\caption{Bandas Sentinel-2 usadas en la clasificación y su posición en el conjunto de atributos.}
+\label{tab:bandas}
+\small
+\begin{tabular}{@{}llccc@{}}
+\toprule
+Banda & Región & Longitud de onda central (nm) & Resolución original (m) & Atributo \\
+\midrule
+B02 & Azul      & 490  & 10 & \texttt{Band\_0} \\
+B03 & Verde     & 560  & 10 & \texttt{Band\_1} \\
+B04 & Rojo      & 665  & 10 & \texttt{Band\_2} \\
+B08 & NIR       & 842  & 10 & \texttt{Band\_3} \\
+B11 & SWIR 1    & 1610 & 20 & \texttt{Band\_4} \\
+B12 & SWIR 2    & 2190 & 20 & \texttt{Band\_5} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Clasificación supervisada}
+En el aprendizaje supervisado se cuenta con un conjunto de valores $X$ y una variable de respuesta $Y$, y
+se busca aprender una función $f(X)$ que permita predecir $Y$. Cuando $Y$ es una variable categórica se habla
+de un problema de \textbf{clasificación} \citep{gulich}. En imágenes, $X$ son las reflectancias de cada
+píxel en las distintas bandas, que definen el \emph{espacio de atributos}, y $Y$ es la clase de cobertura.
+Cuanto más separadas estén las nubes de puntos de cada clase en ese espacio, más fácil será clasificarlas.
+
+\paragraph{Árboles de decisión.} Son métodos no paramétricos que dividen los datos con preguntas del tipo
+SI/NO sobre las variables, por ejemplo ``¿la reflectancia en el NIR es mayor que cierto umbral?''. En cada
+nodo se elige la división que más reduce la incertidumbre, medida con el índice de Gini o con la entropía.
+Un árbol sin límites termina ajustándose de más a los datos de entrenamiento (\emph{overfitting}), por eso
+se controlan parámetros como la profundidad máxima (\texttt{max\_depth}) \citep{gulich}.
+
+\paragraph{Random Forest.} Es un método de \emph{ensemble} basado en \emph{bagging}. Se entrenan muchos
+árboles, cada uno con un subconjunto aleatorio de los datos y de los atributos, y la clase final es la más
+votada \citep{breiman2001}. Es más robusto que un árbol solo y no requiere normalizar los datos. Como
+contrapartida, cuesta más interpretarlo y no funciona bien con conjuntos de datos muy pequeños
+\citep{gulich}. Sus parámetros principales son la cantidad de árboles (\texttt{n\_estimators}) y la
+profundidad máxima.
+
+\paragraph{KNN.} Asigna a cada píxel la clase mayoritaria entre sus $k$ vecinos más cercanos en el espacio de
+atributos. Como trabaja con distancias, es sensible a la escala de las variables, aunque en bandas de un
+mismo sensor las reflectancias están en rangos parecidos. En el curso se recomienda usar
+\texttt{RobustScaler} o \texttt{MinMaxScaler} cuando se quiere escalar.
+
+\subsection{Evaluación de la exactitud}
+La \textbf{matriz de confusión} cruza la clase real con la predicha para cada muestra de prueba
+\citep{congalton1991}. A partir de ella se calculan, para cada clase $i$:
+\begin{equation}
+\text{Precisión}(i)=\frac{TP_i}{TP_i+FP_i},\qquad
+\text{Recall}(i)=\frac{TP_i}{TP_i+FN_i},\qquad
+F1(i)=2\,\frac{\text{Precisión}(i)\cdot\text{Recall}(i)}{\text{Precisión}(i)+\text{Recall}(i)}
+\end{equation}
+En teledetección, $1-\text{Precisión}$ corresponde al \textbf{error de comisión} y $1-\text{Recall}$ al
+\textbf{error de omisión}. La \textbf{exactitud global} es la proporción de aciertos sobre el total, y el
+\textbf{índice kappa} descuenta el acuerdo que se obtendría por azar \citep{cohen1960}:
+\begin{equation}
+\kappa=\frac{p_o-p_e}{1-p_e}
+\end{equation}
+donde $p_o$ es la exactitud observada y $p_e$ la esperada por azar.
+
+La validación cruzada repite varias veces la partición entre entrenamiento y prueba y promedia los
+resultados, lo que da una estimación más estable para elegir hiperparámetros. Hay un detalle importante:
+cuando los píxeles de prueba salen de los mismos polígonos que los de entrenamiento, son muy parecidos entre
+sí (están autocorrelacionados), y las métricas tienden a ser optimistas. Por eso es tan útil una segunda
+validación con un recorte distinto y muestras independientes.
+
+\subsection{Sistema de clasificación CIAF}
+Para definir las clases se tomó como referencia el sistema de categorías del Centro de Investigación en
+Percepción Remota (CIAF), que organiza la cobertura y el uso de la tierra en cuatro niveles de detalle
+\citep{ciaf}. Se trabajó con el primer nivel (exploratorio), que tiene seis categorías y es coherente con lo
+que se puede distinguir en una imagen de 10~m sin trabajo de campo.
+
+% =====================================================================
+\section{Área de estudio y datos}
+\label{sec:datos}
+% =====================================================================
+
+\subsection{Imagen Sentinel-2}
+La imagen se descargó del Copernicus Browser \citep{copernicus}, filtrando por productos Sentinel-2 L2A:
+\begin{center}
+\small \url{https://browser.dataspace.copernicus.eu/?zoom=9&lat=7.2535&lng=-70.83984&themeId=DEFAULT-THEME&visualizationUrl=U2FsdGVkX19Bm\%2FbBYkLNpBX9pPZuAU1EZTmibP5ORrWV76CQCauUWJ5zDuKukkfUZO70\%2FuZejP4VpSQgBXFYHl18\%2BXOfRjUAsMpW8aOgYo8cukIgA7rZD6oIG6C\%2B6Y2w&datasetId=S2_L2A_CDAS}
+\end{center}
+
+\begin{table}[H]
+\centering
+\caption{Datos de la escena utilizada.}
+\label{tab:escena}
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+Producto & \texttt{S2A\_MSIL2A\_20250109T151721\_N0511\_R125\_T19NBH\_20250109T183248} \\
+Satélite & Sentinel-2A \\
+Nivel de procesamiento & L2A (reflectancia de superficie) \\
+Fecha de adquisición & 9 de enero de 2025 \\
+Órbita relativa / tesela & R125 / T19NBH \\
+Sistema de referencia & WGS 84 / UTM zona 19N (EPSG:32619) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+La fecha cae en la temporada seca de la Orinoquía (diciembre a marzo). Esto ayuda a que haya pocas nubes,
+pero también hace que haya más suelo descubierto: playones del río, parcelas preparadas o cosechadas y
+pastos secos. Como se verá en los resultados, eso influyó bastante en la clasificación.
+
+% COLOCAR FIGURA (opcional): pantallazo del Copernicus Browser con la escena y la zona seleccionada.
+
+\subsection{Recortes}
+Se trabajó con dos recortes cuadrados de $5\times5$~km ($500\times500$ píxeles), dibujados en QGIS como
+polígonos (\texttt{recorte1.gpkg} y \texttt{recorte2.gpkg}). Están separados unos 80~km entre sí y tienen
+paisajes distintos a propósito:
+
+\begin{itemize}
+    \item \textbf{Recorte 1 (entrenamiento):} centrado aproximadamente en $7{,}077^\circ$N,
+    $70{,}764^\circ$W. Incluye el casco urbano de Arauca, el aeropuerto, el río con sus meandros, lagunas,
+    bosques y algo de potreros. Hay pocas parcelas agrícolas.
+    \item \textbf{Recorte 2 (validación):} centrado aproximadamente en $6{,}694^\circ$N,
+    $71{,}381^\circ$W. Es un sector rural alrededor de un río, dominado por parcelas, sin centro poblado
+    y con algunas nubes y sombras.
+    % VERIFICAR: nombre del municipio y del río del recorte 2.
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{vista_recorte1.png}
+    \caption{Recorte 1 (entrenamiento).}
+\end{subfigure}\hfill
+\begin{subfigure}{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{vista_recorte2.png}
+    \caption{Recorte 2 (validación).}
+\end{subfigure}
+% COLOCAR FIGURA: las dos vistas en color natural de los recortes, que están en la página 3 del PDF
+% "entregaclasificacion - Colab" (también en salidas/vista_recorte1.png y salidas/vista_recorte2.png).
+\caption{Recortes en color natural (B04-B03-B02).}
+\label{fig:recortes}
+\end{figure}
+
+% =====================================================================
+\section{Metodología}
+\label{sec:metodologia}
+% =====================================================================
+
+Todo el procesamiento se hizo en Google Colab con un único script, \texttt{entregaclasificacion.py},
+armado a partir de las funciones de las Notebooks 02c, 03a y 03b. La Figura~\ref{fig:flujo} resume el flujo.
+
+\begin{figure}[H]
+\centering
+\begin{adjustbox}{max width=\linewidth}
+\begin{tikzpicture}[
+    node distance=0.55cm and 0.6cm,
+    paso/.style={rectangle, rounded corners=2pt, draw=mainBlue, fill=lightGray!60, thick,
+                 text width=3.1cm, align=center, minimum height=1.15cm, font=\footnotesize},
+    flecha/.style={-{Stealth[length=2.2mm]}, thick, mainBlue}
+]
+\node[paso] (a) {Descarga escena S2 L2A (Copernicus Browser)};
+\node[paso, right=of a] (b) {Lectura de bandas desde el \texttt{.zip} (02c)};
+\node[paso, right=of b] (c) {Recortes y remuestreo B11, B12 a 10~m};
+\node[paso, right=of c] (d) {Digitalización de muestras en QGIS};
+\node[paso, below=of d] (e) {\texttt{extraer\_muestras()} y CSV (03a)};
+\node[paso, left=of e] (f) {Train / test 75/25 estratificado};
+\node[paso, left=of f] (g) {Random Forest y KNN, búsqueda de \texttt{max\_depth} (03b)};
+\node[paso, left=of g] (h) {Métricas y mapa del recorte 1};
+\node[paso, below=of h] (i) {Validación con recorte 2 y sus muestras (``Yapa'')};
+\draw[flecha] (a) -- (b);
+\draw[flecha] (b) -- (c);
+\draw[flecha] (c) -- (d);
+\draw[flecha] (d) -- (e);
+\draw[flecha] (e) -- (f);
+\draw[flecha] (f) -- (g);
+\draw[flecha] (g) -- (h);
+\draw[flecha] (h) -- (i);
+\end{tikzpicture}
+\end{adjustbox}
+\caption{Flujo de trabajo seguido.}
+\label{fig:flujo}
+\end{figure}
+
+\subsection{Lectura de bandas y recortes}
+Las bandas se leen directamente del \texttt{.SAFE.zip}, sin descomprimirlo, con la ruta
+\texttt{/vsizip/} de GDAL. Se usa una versión de la función \texttt{leer\_bandas\_l2a()} de la Notebook 02c.
+Con respecto a la notebook se hicieron tres cambios:
+\begin{enumerate}
+    \item Las bandas se devuelven siempre en el orden pedido (B02, B03, B04, B08, B11, B12) y no en el orden
+    en que aparecen dentro del zip.
+    \item El polígono de recorte se reproyecta al CRS de la imagen. En la notebook el CRS estaba escrito a
+    mano para Córdoba (UTM 20S), y aquí la escena está en UTM 19N.
+    \item B11 y B12 se leen a 20~m y se remuestrean a 10~m de forma bilineal sobre la misma ventana del
+    recorte. Así los dos bloques quedan con exactamente el mismo tamaño y se pueden concatenar.
+\end{enumerate}
+Cada recorte se guardó como un GeoTIFF de seis bandas (\texttt{s2\_recorte1.tif} y
+\texttt{s2\_recorte2.tif}), con valor \emph{nodata} igual a 0.
+
+\subsection{Definición de clases y toma de muestras}
+Se usaron las seis categorías del primer nivel CIAF. La Tabla~\ref{tab:clases} resume cómo se reconoció
+cada una al digitalizar. Se trabajó sobre todo en falso color de vegetación (B08-B04-B03) y se comprobó en
+color natural.
+
+\begin{table}[H]
+\centering
+\caption{Clases utilizadas (nivel 1 CIAF) y criterio de interpretación visual.}
+\label{tab:clases}
+\small
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{@{}cp{4.2cm}p{9.6cm}@{}}
+\toprule
+\texttt{Clase} & \texttt{DESC} & Criterio en la imagen \\
+\midrule
+1 & Construcciones & Casco urbano, vías, aeropuerto. Tonos cian y grises en falso color, textura heterogénea. \\
+2 & Cultivos y parcelas & Sobre todo por la forma: lotes geométricos con bordes rectos. En falso color se ven azulados (suelo preparado o con poca cobertura). \\
+3 & Vegetación herbácea descubierta & Pastos y sabana. Tonos naranja o pardo rojizo apagados en falso color, textura lisa. \\
+4 & Bosques y montes & Rojo intenso en falso color y textura más tupida o rugosa (bosques de galería y relictos). \\
+5 & Cuerpos de agua & Río, lagunas, pozos y meandros. Tonos oscuros o azules en falso color, cafés en color natural por los sedimentos. \\
+6 & Tierras eriales & Suelo desnudo: playones y bancos de arena del río y parches sin vegetación. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+En cada recorte se dibujó una capa de polígonos rectangulares (\texttt{muestras\_recorte1.gpkg} y
+\texttt{muestras\_recorte2.gpkg}) con los atributos \texttt{Clase} (entero) y \texttt{DESC} (texto). Se
+buscó que cada rectángulo quedara dentro de una sola cobertura y lejos de los bordes, para no meter píxeles
+mezclados. En el agua esto fue más difícil en los meandros angostos, donde los rectángulos tuvieron que ser
+pequeños. Las muestras del recorte 2 se tomaron de forma independiente, sin reutilizar ningún polígono del
+recorte 1.
+
+En el recorte 2 había nubes y sombras, pero en el recorte 1 no. Como el modelo solo puede reconocer las
+clases con las que fue entrenado, se decidió no muestrearlas.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\linewidth]{muestras_qgis_recorte1.png}
+% COLOCAR FIGURA: pantallazo de QGIS con las muestras del recorte 1 sobre la imagen en color natural y la
+% tabla de atributos abierta (Clase / DESC), como el que se usó al revisar las 27 primeras muestras.
+\caption{Digitalización de las muestras del recorte 1 en QGIS. Los colores siguen la simbología de la Tabla~\ref{tab:clases}.}
+\label{fig:qgis}
+\end{figure}
+
+% COLOCAR FIGURA (opcional): pantallazo de QGIS con las muestras del recorte 2.
+
+Los polígonos se convirtieron en píxeles con la función \texttt{extraer\_muestras()} de la Notebook 03a.
+La función aplica \texttt{mask} con cada polígono y descarta los píxeles de relleno (65535) y los de
+\emph{nodata} (0). La Tabla~\ref{tab:muestras} muestra cuántos píxeles quedaron por clase.
+
+\begin{table}[H]
+\centering
+\caption{Píxeles de muestra por clase en cada recorte.}
+\label{tab:muestras}
+\small
+\begin{tabular}{@{}lrr@{}}
+\toprule
+Clase & Recorte 1 (entrenamiento) & Recorte 2 (validación) \\
+\midrule
+Construcciones                  & \num{1814} & \num{92}   \\
+Cultivos y parcelas             & \num{708}  & \num{3572} \\
+Vegetación herbácea descubierta & \num{1015} & \num{1744} \\
+Bosques y montes                & \num{1172} & \num{1527} \\
+Cuerpos de agua                 & \num{495}  & \num{313}  \\
+Tierras eriales                 & \num{84}   & \num{90}   \\
+\midrule
+Total                           & \num{5288} & \num{7338} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Las proporciones de los dos recortes reflejan lo que hay en cada paisaje. En el recorte 1 domina lo urbano y
+en el recorte 2 las parcelas. La clase más débil es tierras eriales, con apenas 84 píxeles en el recorte de
+entrenamiento (1,6~\% del total).
+
+\subsection{Análisis de separabilidad}
+Antes de entrenar se graficaron las firmas espectrales medias de cada clase (con $\pm$ una desviación
+estándar) y un \emph{pairplot} con la dispersión entre pares de bandas.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\linewidth]{firmas_espectrales_recorte1.png}
+% COLOCAR FIGURA: firmas espectrales del recorte 1, página 4 del PDF "entregaclasificacion - Colab"
+% (salidas/firmas_espectrales_recorte1.png).
+\caption{Firmas espectrales medias por clase en el recorte 1.}
+\label{fig:firmas}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{pairplot_recorte1.png}
+% COLOCAR FIGURA: pairplot de las seis bandas, páginas 4 y 5 del PDF "entregaclasificacion - Colab"
+% (salidas/pairplot_recorte1.png).
+\caption{Histogramas y dispersión entre pares de bandas para las muestras del recorte 1.}
+\label{fig:pairplot}
+\end{figure}
+
+Las firmas se comportan como se esperaba. El agua es la más baja en el NIR y el SWIR. Los bosques tienen el
+salto típico entre el rojo y el NIR, y valores bajos en el SWIR. La vegetación herbácea y los cultivos se
+parecen bastante entre sí, y por eso se solapan en el espacio de atributos. Construcciones y tierras
+eriales tienen reflectancias altas en el visible y el SWIR, con una forma de curva parecida.
+% REVISAR contra la Figura de firmas: ajustar esta descripción si alguna clase se ve distinta.
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{poligonos_recorte1.png}
+    \caption{Recorte 1.}
+\end{subfigure}\hfill
+\begin{subfigure}{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{poligonos_recorte2.png}
+    \caption{Recorte 2.}
+\end{subfigure}
+% COLOCAR FIGURA: polígonos de muestras sobre el falso color, páginas 5 y 6 del PDF
+% "entregaclasificacion - Colab" (salidas/poligonos_recorte1.png y poligonos_recorte2.png).
+\caption{Polígonos de muestras sobre cada recorte en falso color (B08-B04-B03).}
+\label{fig:poligonos}
+\end{figure}
+
+\subsection{Entrenamiento y evaluación}
+Las muestras del recorte 1 se dividieron en 75~\% para entrenamiento (\num{3966} píxeles) y 25~\% para
+prueba (\num{1322}). La división fue estratificada por clase, con mezcla aleatoria y semilla 42, como en la
+Notebook 03b. Se entrenaron:
+\begin{itemize}
+    \item Un \textbf{Random Forest base} con 100 árboles y \texttt{max\_depth=10}.
+    \item Una búsqueda de \texttt{max\_depth} entre 2 y 19, con validación cruzada de 5 particiones sobre
+    los conjuntos de entrenamiento y de prueba. Con la mejor profundidad se entrenó el \textbf{Random Forest
+    final}.
+    \item Dos \textbf{KNN} con $k=3$, uno con los datos sin escalar y otro con \texttt{RobustScaler}, para
+    comparar.
+\end{itemize}
+Todos los modelos se evaluaron primero con el 25~\% de prueba del recorte 1. Después se evaluaron con
+\emph{todas} las muestras del recorte 2, que el modelo nunca vio. Por último, el Random Forest final se
+aplicó a cada recorte completo. Para eso la imagen se reorganiza como una tabla de píxeles por bandas, se
+predice y se vuelve a armar la grilla. Los mapas se guardaron como GeoTIFF y como GeoPackage para revisarlos
+en QGIS.
+
+% =====================================================================
+\section{Resultados}
+\label{sec:resultados}
+% =====================================================================
+
+\subsection{Profundidad del Random Forest}
+La Figura~\ref{fig:profundidad} muestra la exactitud de la validación cruzada para cada profundidad. Hasta
+\texttt{max\_depth} $\approx 4$ la mejora es rápida. Después la curva se aplana, y el máximo en el
+conjunto de prueba se alcanza en 10 (\num{0.974}), con el mismo valor en 11 y 12. Las curvas de
+entrenamiento y de prueba van casi juntas, con una diferencia de menos de un punto, así que dentro del
+recorte 1 no se ve sobreajuste. Por eso el Random Forest final quedó con \texttt{max\_depth=10}, igual que
+el modelo base, y los dos dan exactamente las mismas métricas.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=0.72\linewidth, height=6cm,
+    xlabel={Profundidad máxima (\texttt{max\_depth})}, ylabel={Exactitud (CV, 5 particiones)},
+    xmin=1.5, xmax=19.5, ymin=0.90, ymax=0.985,
+    xtick={2,4,...,18},
+    yticklabel style={/pgf/number format/fixed, /pgf/number format/precision=2,
+                      /pgf/number format/use comma},
+    grid=major, grid style={lightGray},
+    legend pos=south east, legend style={font=\footnotesize},
+]
+\addplot[mainBlue, thick, mark=*, mark size=1.4pt] coordinates {
+(2,0.914)(3,0.943)(4,0.964)(5,0.964)(6,0.966)(7,0.968)(8,0.970)(9,0.973)(10,0.974)
+(11,0.974)(12,0.974)(13,0.972)(14,0.973)(15,0.973)(16,0.973)(17,0.973)(18,0.973)(19,0.973)};
+\addlegendentry{Prueba}
+\addplot[orange!80!black, thick, dashed, mark=square*, mark size=1.2pt] coordinates {
+(2,0.909)(3,0.940)(4,0.961)(5,0.969)(6,0.972)(7,0.974)(8,0.975)(9,0.976)(10,0.976)
+(11,0.977)(12,0.977)(13,0.977)(14,0.978)(15,0.977)(16,0.977)(17,0.977)(18,0.978)(19,0.978)};
+\addlegendentry{Entrenamiento}
+\draw[red, dashed] (axis cs:10,0.90) -- (axis cs:10,0.985);
+\end{axis}
+\end{tikzpicture}
+% Figura generada con los valores impresos por el script (página 7 del PDF "entregaclasificacion - Colab").
+% Si se prefiere la del script, usar salidas/rf_exactitud_vs_profundidad.png (páginas 7-8 del PDF).
+\caption{Exactitud de la validación cruzada del Random Forest en función de la profundidad máxima. La línea roja marca la profundidad elegida.}
+\label{fig:profundidad}
+\end{figure}
+
+\subsection{Evaluación sobre el recorte 1}
+En el conjunto de prueba del recorte 1, los tres modelos dan resultados muy altos y casi iguales
+(Tabla~\ref{tab:global}). En el Random Forest, construcciones y cuerpos de agua quedan perfectos
+(F1 = 1,00) y cultivos y parcelas llega a 0,98. Las confusiones que quedan están entre vegetación herbácea
+y bosques (F1 de 0,95 y 0,96) y en tierras eriales, que tiene un \emph{recall} de 0,86: de 21 píxeles de
+prueba, tres se fueron a otras clases. KNN acierta lo mismo en la exactitud global, pero con tierras
+eriales le va peor (\emph{recall} 0,71).
+
+\begin{table}[H]
+\centering
+\caption{Métricas por clase del Random Forest (\texttt{max\_depth=10}) en el conjunto de prueba del recorte 1.}
+\label{tab:rf_test}
+\small
+\begin{tabular}{@{}lcccr@{}}
+\toprule
+Clase & Precisión & Recall & F1 & Soporte \\
+\midrule
+Construcciones                  & 1,00 & 1,00 & 1,00 & 453 \\
+Cultivos y parcelas             & 0,99 & 0,98 & 0,98 & 177 \\
+Vegetación herbácea descubierta & 0,95 & 0,95 & 0,95 & 254 \\
+Bosques y montes                & 0,96 & 0,97 & 0,96 & 293 \\
+Cuerpos de agua                 & 1,00 & 1,00 & 1,00 & 124 \\
+Tierras eriales                 & 1,00 & 0,86 & 0,92 & 21  \\
+\midrule
+Promedio macro                  & 0,98 & 0,96 & 0,97 & \num{1322} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.62\linewidth]{confusion_rf_mejor_test.png}
+% COLOCAR FIGURA: matriz de confusión del RF max_depth=10 en el test del recorte 1, página 8 del PDF
+% "entregaclasificacion - Colab" (salidas/confusion_rf_mejor_test.png).
+% Las matrices de KNN (páginas 8-10) pueden ir en un anexo si se quiere.
+\caption{Matriz de confusión del Random Forest en el conjunto de prueba del recorte 1.}
+\label{fig:conf_test}
+\end{figure}
+
+\subsection{Validación con el recorte 2}
+Con las muestras independientes del recorte 2, la exactitud del Random Forest baja de \num{0.979} a
+\num{0.668}, y el kappa de \num{0.972} a \num{0.531} (Tabla~\ref{tab:global}). KNN sin escalar queda un
+poco por debajo, con \num{0.642} y $\kappa=\num{0.503}$.
+
+\begin{table}[H]
+\centering
+\caption{Exactitud global e índice kappa de cada modelo.}
+\label{tab:global}
+\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+ & \multicolumn{2}{c}{Prueba recorte 1} & \multicolumn{2}{c}{Validación recorte 2} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Modelo & Exactitud & Kappa & Exactitud & Kappa \\
+\midrule
+Random Forest (\texttt{max\_depth=10}) & \num{0.979} & \num{0.972} & \num{0.668} & \num{0.531} \\
+KNN ($k=3$) sin escalar                & \num{0.979} & \num{0.972} & \num{0.642} & \num{0.503} \\
+KNN ($k=3$) con \texttt{RobustScaler}  & \num{0.977} & \num{0.969} & --- & --- \\
+\bottomrule
+\end{tabular}
+% COMPLETAR: los valores de KNN escalado en la validación no salieron en el PDF exportado (la página 14
+% solo tiene la matriz). Copiarlos de la salida del script en Colab.
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Métricas por clase del Random Forest con las muestras de validación del recorte 2.}
+\label{tab:rf_val}
+\small
+\begin{tabular}{@{}lcccr@{}}
+\toprule
+Clase & Precisión & Recall & F1 & Soporte \\
+\midrule
+Construcciones                  & 0,21 & 1,00 & 0,35 & 92   \\
+Cultivos y parcelas             & 0,81 & 0,55 & 0,66 & \num{3572} \\
+Vegetación herbácea descubierta & 0,48 & 0,72 & 0,58 & \num{1744} \\
+Bosques y montes                & 0,93 & 0,90 & 0,92 & \num{1527} \\
+Cuerpos de agua                 & 0,75 & 0,63 & 0,68 & 313  \\
+Tierras eriales                 & 0,01 & 0,01 & 0,01 & 90   \\
+\midrule
+Promedio macro                  & 0,53 & 0,64 & 0,53 & \num{7338} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.62\linewidth]{confusion_rf_mejor_validacion.png}
+% COLOCAR FIGURA: matriz de confusión del RF en la validación con el recorte 2, página 12 del PDF
+% "entregaclasificacion - Colab" (salidas/confusion_rf_mejor_validacion.png).
+\caption{Matriz de confusión del Random Forest con las muestras del recorte 2.}
+\label{fig:conf_val}
+\end{figure}
+
+Bosques y montes es la única clase que se mantiene firme, con F1 de 0,92. Hay tres clases con problemas
+claros:
+\begin{itemize}
+    \item \textbf{Construcciones:} todas sus muestras se reconocen (\emph{recall} 1,00), pero la precisión
+    cae a 0,21. Esto quiere decir que, de cada cinco píxeles que el modelo llamó construcción, solo uno lo
+    era. Las métricas indican que unos 340 píxeles de otras clases se fueron a construcción.
+    \item \textbf{Tierras eriales:} prácticamente no se reconoce (F1 = 0,01).
+    \item \textbf{Cultivos y vegetación herbácea:} cultivos pierde el 45~\% de sus píxeles
+    (\emph{recall} 0,55), y la herbácea tiene precisión de 0,48. Las cuentas cuadran con que buena parte de
+    los cultivos terminó clasificada como herbácea.
+\end{itemize}
+% VERIFICAR en la matriz (pág. 12) de qué clases vienen los falsos positivos de construcción
+% (se espera que sean sobre todo tierras eriales y cultivos/parcelas).
+
+\subsection{Mapas clasificados}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.75\linewidth]{mapa_recorte1_rf.png}
+% COLOCAR FIGURA: mapa clasificado del recorte 1 con RF, páginas 10 y 11 del PDF
+% "entregaclasificacion - Colab" (salidas/mapa_recorte1_rf.png).
+\caption{Mapa clasificado del recorte 1 (Random Forest, \texttt{max\_depth=10}).}
+\label{fig:mapa1}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.75\linewidth]{mapa_recorte2_rf.png}
+% COLOCAR FIGURA: mapa clasificado del recorte 2 con RF. No quedó en el PDF exportado (se corta en la
+% página 14); tomarlo de salidas/mapa_recorte2_rf.png o hacer el pantallazo en QGIS con
+% clasificacion_recorte2_rf.gpkg.
+\caption{Mapa clasificado del recorte 2 (Random Forest, \texttt{max\_depth=10}).}
+\label{fig:mapa2}
+\end{figure}
+
+% =====================================================================
+\section{Análisis de resultados}
+\label{sec:analisis}
+% =====================================================================
+
+\subsection{Lo que el modelo clasificó bien}
+En los dos recortes, \textbf{los bosques y la vegetación herbácea descubierta} se ven bien delimitados en
+los mapas. En el caso de los bosques coincide con las métricas: es la clase más estable al pasar de un
+recorte al otro. Tiene sentido, porque su combinación de reflectancia alta en el NIR y baja en el SWIR es
+muy distinta de la de las demás clases.
+
+En el recorte 1, el modelo reconoció como agua \textbf{las lagunas alargadas que acompañan al río}
+(Figura~\ref{fig:lagunas}). No se daba por hecho, porque no todas tenían muestras y algunas tienen
+vegetación en los bordes. También quedaron bien \textbf{el casco urbano y el aeropuerto}
+(Figura~\ref{fig:urbano}): la pista y las construcciones salen como una sola mancha de construcciones,
+cortada por los corredores de vegetación.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.45\linewidth]{lagunas_recorte1.png}
+% COLOCAR FIGURA: pantallazo de QGIS del mapa del recorte 1 en la zona de las lagunas alargadas paralelas
+% al río (clasificadas en azul como cuerpos de agua).
+\caption{Lagunas del recorte 1 clasificadas correctamente como cuerpos de agua.}
+\label{fig:lagunas}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\linewidth]{urbano_aeropuerto_recorte1.png}
+% COLOCAR FIGURA: pantallazo doble del aeropuerto y la zona urbana (mapa clasificado a la izquierda,
+% color natural a la derecha).
+\caption{Zona urbana y aeropuerto en el recorte 1: clasificación (izquierda) e imagen en color natural (derecha).}
+\label{fig:urbano}
+\end{figure}
+
+\subsection{Suelos descubiertos clasificados como construcción}
+El error más visible está en las superficies con el suelo descubierto: los playones y bancos de arena del
+río y algunas parcelas sin cobertura. El modelo las clasifica como \textbf{construcciones}, a veces con un
+borde de tierras eriales alrededor (Figuras~\ref{fig:playones} y~\ref{fig:parche}).
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{playones_clasificacion.png}
+    \caption{Clasificación.}
+\end{subfigure}\hfill
+\begin{subfigure}{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{playones_color_natural.png}
+    \caption{Color natural.}
+\end{subfigure}
+% COLOCAR FIGURA: pantallazos del meandro con los playones de arena (clasificados en rojo) y la misma zona
+% en color natural, con el rectángulo de la muestra de tierras eriales.
+\caption{Playones del río clasificados como construcciones. El rectángulo es una muestra de tierras eriales.}
+\label{fig:playones}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{parche_suelo_clasificacion.png}
+    \caption{Clasificación.}
+\end{subfigure}\hfill
+\begin{subfigure}{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{parche_suelo_color_natural.png}
+    \caption{Color natural.}
+\end{subfigure}
+% COLOCAR FIGURA: pantallazos del parche de suelo descubierto junto a la vía (rojo con borde café en la
+% clasificación) y la misma zona en color natural, con la muestra de tierras eriales.
+\caption{Parche de suelo descubierto clasificado como construcciones con borde de tierras eriales.}
+\label{fig:parche}
+\end{figure}
+
+Hay varias razones que se suman:
+\begin{enumerate}
+    \item \textbf{Firmas parecidas.} La arena seca y el suelo arado reflejan mucho en el visible y en el
+    SWIR, igual que los techos, el pavimento y la pista del aeropuerto. En el espacio de seis bandas,
+    esas superficies quedan muy cerca de las construcciones.
+    \item \textbf{Muy pocas muestras de tierras eriales.} En el recorte 1 solo hubo un polígono de esta clase
+    (84 píxeles, contra \num{1814} de construcciones). Los árboles del Random Forest casi no ``vieron''
+    suelo desnudo, así que, ante un píxel brillante, la clase que más votos recibe es construcción. El borde
+    café que aparece alrededor de los playones corresponde a los píxeles de transición, más oscuros o más
+    húmedos, que se parecen a la única muestra de eriales.
+    \item \textbf{La muestra de eriales no representa toda la variabilidad.} Un parche de suelo en medio de
+    un potrero no responde igual que un banco de arena seca del río. Por eso, en la validación, tierras
+    eriales queda en F1 = 0,01.
+\end{enumerate}
+
+En el recorte 1 se ve el mismo problema en una zona de parcelas (Figura~\ref{fig:parcela1}). Un lote con el
+suelo descubierto quedó como construcción y tierras eriales. El rectángulo amarillo, una muestra de cultivos
+y parcelas que está al lado, sí quedó bien clasificado.
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{parcela_recorte1_color_natural.png}
+    \caption{Color natural.}
+\end{subfigure}\hfill
+\begin{subfigure}{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{parcela_recorte1_clasificacion.png}
+    \caption{Clasificación.}
+\end{subfigure}
+% COLOCAR FIGURA: pantallazos de la parcela del recorte 1 con la muestra amarilla de cultivos (color natural
+% y clasificación, donde aparece la mancha roja con borde café).
+\caption{Parcela con suelo descubierto en el recorte 1 clasificada como construcciones.}
+\label{fig:parcela1}
+\end{figure}
+
+\subsection{El ``invernadero'' del recorte 2}
+En el recorte 2 se tomó como construcción una zona que en falso color se veía cian brillante, con una forma
+regular, y que parecía un invernadero (Figura~\ref{fig:invernadero}). Revisándola en color natural, se ve
+más bien como un lote de color café claro, con textura de suelo y sin techos. Lo más probable es que sea
+\textbf{una parcela con el suelo descubierto}, arada o preparada para siembra, o recién cosechada. En CIAF
+correspondería a cultivos y parcelas (temporales, en barbecho) o, si está abandonada, a tierras eriales. Sin
+verificación en campo no se puede confirmar.
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{0.40\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{invernadero_color_natural.png}
+    \caption{Color natural.}
+\end{subfigure}\hspace{0.05\linewidth}
+\begin{subfigure}{0.40\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{invernadero_falso_color.png}
+    \caption{Falso color (B08-B04-B03).}
+\end{subfigure}
+% COLOCAR FIGURA: pantallazos de la muestra roja del supuesto invernadero en color natural y en falso color.
+\caption{Zona del recorte 2 que se muestreó como construcción (invernadero) y que probablemente es una parcela con suelo descubierto.}
+\label{fig:invernadero}
+\end{figure}
+
+Este error de etiquetado ayuda a entender las métricas de construcciones en la validación. De las 92
+muestras de esa clase en el recorte 2, una parte corresponde a esa parcela. El modelo la clasificó como
+construcción, que era la etiqueta que se le había puesto. Así, el \emph{recall} de 1,00 está inflado: el
+modelo y la etiqueta se equivocan en el mismo sentido. Al mismo tiempo, la baja precisión (0,21) muestra que
+el modelo manda a construcción muchas otras superficies brillantes.
+
+\subsection{Nubes y sombras}
+Las nubes del recorte 2 salieron clasificadas como construcciones (Figura~\ref{fig:nubes}). Era de esperar:
+una nube refleja mucho en todas las bandas, y entre las seis clases entrenadas la más brillante es
+construcción. Como no había nubes ni sombras en el recorte 1, ninguna clase las representa, y el modelo las
+asigna a la clase más parecida que conoce. Este error no aparece en las métricas, porque no se tomaron
+muestras sobre nubes, pero sí ensucia el mapa. Las sombras, por ser oscuras, pueden terminar como agua o
+como bosque.
+% REVISAR en el mapa del recorte 2 cómo quedaron las sombras y ajustar la última frase.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.38\linewidth]{nubes_recorte2.png}
+% COLOCAR FIGURA: pantallazo del mapa del recorte 2 donde las nubes aparecen en rojo (construcciones).
+\caption{Nubes del recorte 2 clasificadas como construcciones.}
+\label{fig:nubes}
+\end{figure}
+
+\subsection{Cultivos y vegetación herbácea}
+La otra gran fuente de error es la confusión entre \textbf{cultivos y parcelas} y \textbf{vegetación
+herbácea descubierta}. Se veía venir desde la toma de muestras. Los cultivos se identificaron más que todo
+por la forma de las parcelas y por los tonos azulados del suelo preparado, y la herbácea por los tonos
+naranja. Pero un cultivo ya crecido tiene una firma muy parecida a la de un pasto. El clasificador trabaja
+píxel a píxel y no ``ve'' la forma del lote, así que pierde justamente el criterio que se usó para
+diferenciarlas.
+
+A esto se suma que el recorte 1 tenía pocas parcelas (708 píxeles) y el recorte 2 está dominado por ellas
+(\num{3572}). El modelo aprendió los cultivos con pocos ejemplos y casi todos del mismo tipo. Cuando
+encontró parcelas en otros estados en el recorte 2, muchas las clasificó como herbácea.
+
+\subsection{Cuerpos de agua}
+El río se clasifica sin problema, pero en el recorte 2 el \emph{recall} del agua baja a 0,63. Coincide con
+lo que se notó al muestrear: el agua es fácil de ver en el cauce principal, pero no tanto en algunas
+lagunas, pozos y meandros. Ahí el agua es poco profunda, tiene sedimentos o vegetación, y los píxeles de
+borde se mezclan con la orilla. Como las muestras de los meandros fueron pequeñas, una parte de sus píxeles
+probablemente ya incluía orilla.
+
+\subsection{Diferencia entre las dos validaciones}
+La caída de 0,98 a 0,67 en la exactitud no significa que la primera evaluación esté mal hecha. Mide cosas
+distintas. En el recorte 1, los píxeles de prueba salen de los mismos polígonos que los de entrenamiento y
+son casi idénticos a ellos, por lo que el resultado es optimista. El recorte 2 tiene otro paisaje, otras
+proporciones de clases, nubes y un error de etiquetado, y muestra mejor cómo se comportaría el modelo en una
+zona nueva. Por eso tenía sentido hacer la segunda validación que pide la consigna.
+
+\begin{analisisBox}{Segunda clasificación (en preparación)}
+A partir de lo anterior, se va a realizar una segunda clasificación con estos cambios:
+\begin{itemize}
+    \item Corregir la muestra del supuesto invernadero del recorte 2, reclasificándola como cultivos y
+    parcelas (o eliminándola si no se puede confirmar).
+    \item Aumentar las muestras de \textbf{tierras eriales} en el recorte 1, incluyendo playones y bancos de
+    arena del río y parcelas con el suelo descubierto, para que el modelo aprenda a separarlas de las
+    construcciones.
+    \item Tomar más muestras de \textbf{cultivos y parcelas} en el recorte 1, en distintos estados (con
+    cultivo, arado, en barbecho). Si hace falta, se moverá o ampliará el recorte para incluir más lotes.
+    \item Tratar las nubes y sombras, ya sea con una clase propia muestreada en ambos recortes o
+    enmascarándolas con la capa de clasificación de escena (SCL) que trae el producto L2A.
+    \item Evaluar si agregar índices como el NDVI y el NDWI como atributos mejora la separación entre
+    agua, vegetación y suelo.
+\end{itemize}
+\end{analisisBox}
+
+% =====================================================================
+\section{Conclusiones}
+% =====================================================================
+
+\begin{itemize}
+    \item Fue posible reproducir con una escena propia, sobre Arauca, el flujo de trabajo del curso:
+    lectura de Sentinel-2 L2A desde el zip, recortes, muestras, entrenamiento, evaluación y mapas. Solo hubo
+    que adaptar el sistema de coordenadas y el orden de las bandas.
+    \item Random Forest y KNN dieron prácticamente lo mismo en el recorte de entrenamiento (exactitud cercana
+    a 0,98). En la validación externa, el Random Forest fue un poco mejor (0,668 contra 0,642). La
+    profundidad óptima quedó en 10, sin señales de sobreajuste.
+    \item La validación con un recorte distinto fue clave. Las métricas internas daban casi un modelo
+    perfecto, mientras que con muestras independientes la exactitud bajó a 0,67 y el kappa a 0,53. Ahí se
+    vieron los problemas reales del modelo.
+    \item Las clases más confiables fueron bosques y montes y, en el recorte 1, construcciones y cuerpos de
+    agua. Los errores principales vienen de los suelos descubiertos y brillantes clasificados como
+    construcción, de la confusión entre cultivos y vegetación herbácea, y de las nubes, que no estaban en
+    el entrenamiento.
+    \item Buena parte de esos errores se origina en las muestras más que en el algoritmo: pocos píxeles de
+    tierras eriales, pocas parcelas en el recorte de entrenamiento y una muestra mal interpretada. Por eso
+    la segunda clasificación se enfoca en mejorar las muestras.
+    \item Al trabajar píxel a píxel se pierde información que el intérprete sí usa, como la forma de las
+    parcelas o la textura del bosque. Ese es un límite de este enfoque para separar cultivos de pastos.
+\end{itemize}
+
+% =====================================================================
+\begin{thebibliography}{9}
+% =====================================================================
+\bibitem[Breiman(2001)]{breiman2001}
+Breiman, L. (2001). Random forests. \textit{Machine Learning}, 45(1), 5--32.
+
+\bibitem[{CIAF}(s.f.)]{ciaf}
+Centro de Investigación en Percepción Remota (CIAF) (s.f.). \textit{Categorías de cobertura y uso de la
+tierra por nivel de detalle}. Instituto Geográfico Agustín Codazzi. Material de clase, Universidad
+Distrital Francisco José de Caldas.
+% COMPLETAR: referencia exacta del documento CIAF que les dieron en clase.
+
+\bibitem[Chuvieco(2010)]{chuvieco2010}
+Chuvieco, E. (2010). \textit{Teledetección ambiental: la observación de la Tierra desde el espacio}
+(3.ª ed.). Ariel.
+
+\bibitem[Cohen(1960)]{cohen1960}
+Cohen, J. (1960). A coefficient of agreement for nominal scales. \textit{Educational and Psychological
+Measurement}, 20(1), 37--46.
+
+\bibitem[Congalton(1991)]{congalton1991}
+Congalton, R. G. (1991). A review of assessing the accuracy of classifications of remotely sensed data.
+\textit{Remote Sensing of Environment}, 37(1), 35--46.
+
+\bibitem[{Copernicus}(2025)]{copernicus}
+Copernicus Data Space Ecosystem (2025). \textit{Copernicus Browser}.
+\url{https://browser.dataspace.copernicus.eu/}
+
+\bibitem[Drusch et~al.(2012)]{drusch2012}
+Drusch, M., Del Bello, U., Carlier, S., Colin, O., Fernandez, V., Gascon, F., et~al. (2012). Sentinel-2:
+ESA's optical high-resolution mission for GMES operational services. \textit{Remote Sensing of
+Environment}, 120, 25--36.
+
+\bibitem[{ESA}(2015)]{esa2015}
+European Space Agency (2015). \textit{Sentinel-2 User Handbook}. ESA Standard Document.
+
+\bibitem[{Instituto Gulich}(s.f.)]{gulich}
+Instituto de Altos Estudios Espaciales Mario Gulich (s.f.). \textit{Procesamiento digital de imágenes
+satelitales y datos geoespaciales con Python}, Bloque 03: presentaciones de clase y Notebooks 02c, 03a y
+03b. Campus Virtual, Universidad Nacional de Córdoba -- CONAE.
+
+\bibitem[Pedregosa et~al.(2011)]{pedregosa2011}
+Pedregosa, F., Varoquaux, G., Gramfort, A., Michel, V., Thirion, B., Grisel, O., et~al. (2011).
+Scikit-learn: Machine learning in Python. \textit{Journal of Machine Learning Research}, 12, 2825--2830.
+\end{thebibliography}
+
+\appendix
+
+% =====================================================================
+\section{Organización del código fuente}
+\label{anx:codigo}
+% =====================================================================
+El código completo está en \texttt{entregaclasificacion.py}, en el repositorio
+\url{https://github.com/AlexandraUD/ClasificacionSupervisada} (Anexo~\ref{anx:archivos}), y no se transcribe
+en este documento. Usa \texttt{rasterio}, \texttt{geopandas}, \texttt{scikit-learn} \citep{pedregosa2011},
+\texttt{matplotlib} y \texttt{seaborn}. Sus funciones se agrupan así:
+\begin{itemize}
+    \item \textbf{Lectura de Sentinel-2 (02c):} \texttt{leer\_bandas\_l2a}, \texttt{leer\_bandas\_remuestreadas},
+    \texttt{generar\_recorte}.
+    \item \textbf{Muestras (03a):} \texttt{extraer\_muestras}, \texttt{leer\_vector\_muestras},
+    \texttt{graficar\_firmas\_espectrales}, \texttt{graficar\_recorte\_con\_poligonos}.
+    \item \textbf{Clasificación y evaluación (03b):} \texttt{evaluar} (matriz de confusión, reporte, exactitud
+    y kappa) y \texttt{clasificar\_imagen} (mapa en GeoTIFF y GeoPackage).
+    \item \textbf{Visualización y utilidades:} \texttt{escalar\_imagen}, \texttt{escalar\_imagen\_multibanda},
+    \texttt{asignar\_colores} (colores de la simbología de QGIS), \texttt{preparar\_zip}, \texttt{buscar\_vector}.
+\end{itemize}
+En Colab se ejecuta con:
+\begin{lstlisting}[language=Python]
+!pip install -q rasterio geopandas scikit-learn scipy matplotlib seaborn gdown
+!wget -q -O entregaclasificacion.py https://raw.githubusercontent.com/AlexandraUD/ClasificacionSupervisada/main/entregaclasificacion.py
+%run entregaclasificacion.py
+\end{lstlisting}
+
+% =====================================================================
+\section{Archivos de la entrega}
+\label{anx:archivos}
+% =====================================================================
+\begin{table}[H]
+\centering
+\caption{Archivos que acompañan al informe.}
+\small
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{@{}p{5.6cm}p{9.8cm}@{}}
+\toprule
+Archivo & Contenido \\
+\midrule
+\texttt{entregaclasificacion.py} & Script completo: lectura, recortes, muestras, entrenamiento, evaluación y mapas. \\
+\texttt{recorte1.gpkg}, \texttt{recorte2.gpkg} & Polígonos de los dos recortes de $5\times5$~km. \\
+\texttt{muestras\_recorte1.gpkg} & Muestras de entrenamiento (campos \texttt{Clase} y \texttt{DESC}). \\
+\texttt{muestras\_recorte2.gpkg} & Muestras independientes de validación. \\
+\texttt{simblogia.qml} & Simbología de QGIS de las clases. \\
+\texttt{salidas/s2\_recorte1.tif}, \texttt{s2\_recorte2.tif} & Recortes de seis bandas a 10~m. \\
+\texttt{salidas/muestras\_recorte*.csv} & Píxeles de muestra extraídos. \\
+\texttt{salidas/clasificacion\_recorte*\_rf.tif / .gpkg} & Mapas clasificados (raster y vector). \\
+\texttt{salidas/*.png} & Figuras generadas por el script. \\
+\texttt{entregaclasificacion - Colab.pdf} & Salida completa de la ejecución en Colab. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\end{document}
