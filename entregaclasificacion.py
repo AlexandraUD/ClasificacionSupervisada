@@ -15,11 +15,12 @@ Imagen: S2A_MSIL2A_20250109T151721_N0511_R125_T19NBH_20250109T183248.SAFE
 -------------------------------------------------------------------------------
 USO EN GOOGLE COLAB (el script se ejecuta en DOS pasadas)
 -------------------------------------------------------------------------------
-Celda 1:   !pip install -q rasterio geopandas scikit-learn scipy matplotlib
+Celda 1:   !pip install -q rasterio geopandas scikit-learn scipy matplotlib seaborn gdown
 Celda 2:   !wget -q -O entregaclasificacion.py https://raw.githubusercontent.com/AlexandraUD/ClasificacionSupervisada/main/entregaclasificacion.py
 Celda 3:   %run entregaclasificacion.py
 
-Carpeta de trabajo en Drive (CARPETA, más abajo) con estos archivos de ENTRADA:
+Carpeta de trabajo en Drive (CARPETA, más abajo). Entradas (si no están, el script las
+descarga solo: el zip con gdown y los vectores desde el repo de GitHub):
   - el .zip de la Sentinel-2 (S2A_MSIL2A_..._T19NBH_....SAFE.zip), sin descomprimir
   - recorte1.gpkg / recorte2.gpkg                      -> polígonos de recorte (hechos en QGIS)
   - muestras_recorte1.gpkg / muestras_recorte2.gpkg    -> polígonos de muestras con campos
@@ -40,6 +41,7 @@ import os
 import re
 import shutil
 import sys
+import urllib.request
 from zipfile import ZipFile
 
 import geopandas as gpd
@@ -47,6 +49,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import rasterio
+import seaborn as sns
 from matplotlib.colors import Normalize
 from matplotlib.patches import Patch
 from rasterio.enums import Resampling
@@ -54,8 +57,12 @@ from rasterio.mask import mask
 from rasterio.windows import from_bounds
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (ConfusionMatrixDisplay, accuracy_score,
-                             classification_report, confusion_matrix)
+                             classification_report, cohen_kappa_score,
+                             confusion_matrix)
 from sklearn.model_selection import cross_val_score, train_test_split
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import RobustScaler
 
 # =============================================================================
 # CONFIGURACIÓN  (lo único que normalmente hay que tocar)
@@ -71,6 +78,12 @@ RECORTE1 = "recorte1"
 RECORTE2 = "recorte2"
 MUESTRAS1 = "muestras_recorte1"
 MUESTRAS2 = "muestras_recorte2"
+
+# Si el zip no está en CARPETA, se descarga con gdown desde este archivo de Drive
+# (el archivo debe estar compartido como "Cualquier persona con el enlace")
+ID_DRIVE_ZIP = "1B-jaWC9GyF4SwkIw90Z7f_6Wc3--Hw9L"
+# Si faltan los vectores en CARPETA, se bajan del repo de GitHub
+URL_REPO_RAW = "https://raw.githubusercontent.com/AlexandraUD/ClasificacionSupervisada/main/"
 
 # Copiar el zip del Drive al disco local de Colab (lee mucho más rápido)
 COPIAR_ZIP_LOCAL = True
@@ -329,6 +342,7 @@ def evaluar(modelo, X, y, dict_clases, titulo, nombre_png):
     print(classification_report(y, y_pred, labels=etiquetas, target_names=nombres, zero_division=0))
     acc = accuracy_score(y, y_pred)
     print(f"Precisión global: {acc:.3f}")
+    print(f"Índice kappa: {cohen_kappa_score(y, y_pred):.3f}")
     return acc
 
 
@@ -388,15 +402,32 @@ def buscar_vector(nombre_base):
         ruta = os.path.join(CARPETA, nombre_base + ext)
         if os.path.exists(ruta):
             return ruta
-    return None
+    # Si no está en la carpeta, intenta bajarlo del repo de GitHub
+    ruta = os.path.join(CARPETA, nombre_base + ".gpkg")
+    try:
+        urllib.request.urlretrieve(URL_REPO_RAW + nombre_base + ".gpkg", ruta)
+        print(f"Descargado desde GitHub: {nombre_base}.gpkg")
+        return ruta
+    except Exception:
+        if os.path.exists(ruta):
+            os.remove(ruta)
+        return None
 
 
 def preparar_zip():
-    """Ubica el zip de la Sentinel-2 y, si está en Drive, lo copia al disco local de Colab."""
+    """Ubica el zip de la Sentinel-2 (o lo descarga) y lo copia al disco local de Colab."""
     candidatos = sorted(glob.glob(os.path.join(CARPETA, PRODUCTO + "*.zip")))
     if not candidatos:
-        sys.exit(f"No encontré '{PRODUCTO}*.zip' dentro de {CARPETA}. "
-                 "Subí el zip a esa carpeta (sin descomprimirlo).")
+        import gdown
+        destino = os.path.join("/content" if os.path.isdir("/content") else CARPETA,
+                               PRODUCTO + ".SAFE.zip")
+        if not os.path.exists(destino) or not os.path.getsize(destino):
+            print("Descargando el zip de la Sentinel-2 desde Drive (~1 GB, puede tardar)...")
+            gdown.download(id=ID_DRIVE_ZIP, output=destino, quiet=False)
+        if not os.path.exists(destino) or not os.path.getsize(destino):
+            sys.exit("No pude descargar el zip. Revisa que el archivo esté compartido con "
+                     f"'Cualquier persona con el enlace' o súbelo a {CARPETA}.")
+        return destino
     origen = candidatos[0]
     if COPIAR_ZIP_LOCAL and origen.startswith("/content/drive"):
         destino = os.path.join("/content", os.path.basename(origen))
@@ -492,6 +523,11 @@ def main():
     print(muestras2.groupby(["Clase", "DESC"]).size().to_string())
 
     graficar_firmas_espectrales(muestras1, dict_clases, "firmas_espectrales_recorte1.png")
+    # Dispersión entre pares de bandas (Notebook 03a); se usa una submuestra para que sea rápido
+    sub = muestras1[COLUMNAS_BANDAS + ["DESC"]].sample(min(3000, len(muestras1)), random_state=SEMILLA)
+    sns.pairplot(sub, hue="DESC", plot_kws={"alpha": 0.4, "s": 10})
+    guardar_figura("pairplot_recorte1.png")
+
     graficar_recorte_con_poligonos(tif1, pols1, "Recorte 1 con polígonos de muestras",
                                    "poligonos_recorte1.png")
     graficar_recorte_con_poligonos(tif2, pols2, "Recorte 2 con polígonos de muestras",
@@ -544,7 +580,15 @@ def main():
     evaluar(rf_mejor, X_test, y_test, dict_clases,
             f"RF max_depth={best_prof} - test recorte 1", "confusion_rf_mejor_test.png")
 
-    # 3.4 Mapa clasificado del recorte 1
+    # 3.4 Comparación con KNN (3 vecinos), sin escalar y con RobustScaler
+    knn = KNeighborsClassifier(n_neighbors=3).fit(X_train, y_train)
+    knn_esc = make_pipeline(RobustScaler(), KNeighborsClassifier(n_neighbors=3)).fit(X_train, y_train)
+    evaluar(knn, X_test, y_test, dict_clases, "KNN sin escalar - test recorte 1",
+            "confusion_knn_test.png")
+    evaluar(knn_esc, X_test, y_test, dict_clases, "KNN escalado - test recorte 1",
+            "confusion_knn_esc_test.png")
+
+    # 3.5 Mapa clasificado del recorte 1
     print("\nClasificando el recorte 1...")
     clasificar_imagen(rf_mejor, tif1, os.path.join(SALIDAS, "clasificacion_recorte1_rf.tif"),
                       dict_clases, f"Mapa clasificado - Recorte 1 - RF (max_depth={best_prof})",
@@ -561,6 +605,11 @@ def main():
             "confusion_rf_base_validacion.png")
     evaluar(rf_mejor, X_val, Y_val, dict_clases, f"RF max_depth={best_prof} - VALIDACIÓN recorte 2",
             "confusion_rf_mejor_validacion.png")
+
+    evaluar(knn, X_val, Y_val, dict_clases, "KNN sin escalar - VALIDACIÓN recorte 2",
+            "confusion_knn_validacion.png")
+    evaluar(knn_esc, X_val, Y_val, dict_clases, "KNN escalado - VALIDACIÓN recorte 2",
+            "confusion_knn_esc_validacion.png")
 
     print("\nClasificando el recorte 2...")
     clasificar_imagen(rf_mejor, tif2, os.path.join(SALIDAS, "clasificacion_recorte2_rf.tif"),
