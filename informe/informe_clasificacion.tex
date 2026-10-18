@@ -107,9 +107,10 @@ En este trabajo se clasificó la cobertura de la tierra de una escena Sentinel-2
 a 10~m y seis clases del primer nivel del sistema CIAF: construcciones, cultivos y parcelas, vegetación herbácea
 descubierta, bosques y montes, cuerpos de agua y tierras eriales. Las muestras se digitalizaron en QGIS sobre
 dos recortes de $5\times5$~km. Con ellas se entrenó un Random Forest, se buscó la profundidad máxima por
-validación cruzada y, a modo de comparación, se probó un KNN. Sobre el recorte de entrenamiento la exactitud
-global fue de \num{0.979} ($\kappa=\num{0.972}$). Al validar con el segundo recorte, que tiene muestras
-independientes, bajó a \num{0.668} ($\kappa=\num{0.531}$). La diferencia se explica sobre todo por tres cosas:
+validación cruzada y, a modo de comparación, se probó un KNN con y sin escalado. Sobre el recorte de
+entrenamiento la exactitud global del Random Forest fue de \num{0.979} ($\kappa=\num{0.972}$). Al validar con
+el segundo recorte, que tiene muestras independientes, bajó a \num{0.668} ($\kappa=\num{0.531}$). En esa
+validación el mejor modelo fue el KNN escalado, con \num{0.685} ($\kappa=\num{0.562}$). La diferencia se explica sobre todo por tres cosas:
 los suelos descubiertos y brillantes (playones, parcelas aradas) terminan clasificados como construcción, los
 cultivos se confunden con la vegetación herbácea, y en el segundo recorte hay nubes y sombras que no hacían
 parte del entrenamiento. Al final se plantean los ajustes para una segunda clasificación.
@@ -312,6 +313,21 @@ pero también hace que haya más suelo descubierto: playones del río, parcelas 
 pastos secos. Como se verá en los resultados, eso influyó bastante en la clasificación.
 
 % COLOCAR FIGURA (opcional): pantallazo del Copernicus Browser con la escena y la zona seleccionada.
+
+\subsection{Acceso a los datos y al código}
+Para poder reproducir el trabajo, los insumos quedaron disponibles en línea:
+\begin{itemize}
+    \item \textbf{Escena Sentinel-2 (\texttt{.SAFE.zip}) en Google Drive:}
+    \url{https://drive.google.com/file/d/1B-jaWC9GyF4SwkIw90Z7f_6Wc3--Hw9L/view?usp=drive_link}.
+    El script la descarga solo con \texttt{gdown} si no la encuentra en la carpeta de trabajo.
+    \item \textbf{Cuaderno de Google Colab con la ejecución:}
+    \url{https://colab.research.google.com/drive/1fWRmWLi8-Nx8rE_cn-RFM_4ckKovzE4d?usp=drive_link}.
+    \item \textbf{Repositorio en GitHub} (script, vectores de recortes y muestras, simbología, salida de
+    Colab e informe): \url{https://github.com/AlexandraUD/ClasificacionSupervisada}.
+    \item \textbf{Script:}
+    \url{https://github.com/AlexandraUD/ClasificacionSupervisada/blob/main/entregaclasificacion.py}.
+\end{itemize}
+% Revisar que el zip y el Colab estén compartidos como "Cualquier persona con el enlace".
 
 \subsection{Recortes}
 Se trabajó con dos recortes cuadrados de $5\times5$~km ($500\times500$ píxeles), dibujados en QGIS como
@@ -625,7 +641,10 @@ Promedio macro                  & 0,98 & 0,96 & 0,97 & \num{1322} \\
 \subsection{Validación con el recorte 2}
 Con las muestras independientes del recorte 2, la exactitud del Random Forest baja de \num{0.979} a
 \num{0.668}, y el kappa de \num{0.972} a \num{0.531} (Tabla~\ref{tab:global}). KNN sin escalar queda un
-poco por debajo, con \num{0.642} y $\kappa=\num{0.503}$.
+poco por debajo, con \num{0.642} y $\kappa=\num{0.503}$. En cambio, el KNN con los datos escalados
+(\texttt{RobustScaler}) es el que mejor generaliza, con \num{0.685} y $\kappa=\num{0.562}$. En el recorte 1
+los tres modelos habían quedado prácticamente empatados, así que esta diferencia solo aparece con muestras
+independientes.
 
 \begin{table}[H]
 \centering
@@ -640,30 +659,30 @@ Modelo & Exactitud & Kappa & Exactitud & Kappa \\
 \midrule
 Random Forest (\texttt{max\_depth=10}) & \num{0.979} & \num{0.972} & \num{0.668} & \num{0.531} \\
 KNN ($k=3$) sin escalar                & \num{0.979} & \num{0.972} & \num{0.642} & \num{0.503} \\
-KNN ($k=3$) con \texttt{RobustScaler}  & \num{0.977} & \num{0.969} & --- & --- \\
+KNN ($k=3$) con \texttt{RobustScaler}  & \num{0.977} & \num{0.969} & \textbf{\num{0.685}} & \textbf{\num{0.562}} \\
 \bottomrule
 \end{tabular}
-% COMPLETAR: los valores de KNN escalado en la validación no salieron en el PDF exportado (la página 14
-% solo tiene la matriz). Copiarlos de la salida del script en Colab.
 \end{table}
 
 \begin{table}[H]
 \centering
-\caption{Métricas por clase del Random Forest con las muestras de validación del recorte 2.}
+\caption{Métricas por clase con las muestras de validación del recorte 2: Random Forest, KNN sin escalar y KNN escalado.}
 \label{tab:rf_val}
 \small
-\begin{tabular}{@{}lcccr@{}}
+\begin{tabular}{@{}lccccccr@{}}
 \toprule
-Clase & Precisión & Recall & F1 & Soporte \\
+ & \multicolumn{2}{c}{Random Forest} & \multicolumn{2}{c}{KNN sin escalar} & \multicolumn{2}{c}{KNN escalado} & \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+Clase & Prec. & Recall & Prec. & Recall & Prec. & Recall & Soporte \\
 \midrule
-Construcciones                  & 0,21 & 1,00 & 0,35 & 92   \\
-Cultivos y parcelas             & 0,81 & 0,55 & 0,66 & \num{3572} \\
-Vegetación herbácea descubierta & 0,48 & 0,72 & 0,58 & \num{1744} \\
-Bosques y montes                & 0,93 & 0,90 & 0,92 & \num{1527} \\
-Cuerpos de agua                 & 0,75 & 0,63 & 0,68 & 313  \\
-Tierras eriales                 & 0,01 & 0,01 & 0,01 & 90   \\
+Construcciones                  & 0,21 & 1,00 & 0,26 & 0,98 & 0,21 & 0,98 & 92   \\
+Cultivos y parcelas             & 0,81 & 0,55 & 0,91 & 0,53 & 0,97 & 0,58 & \num{3572} \\
+Vegetación herbácea descubierta & 0,48 & 0,72 & 0,45 & 0,85 & 0,49 & 0,90 & \num{1744} \\
+Bosques y montes                & 0,93 & 0,90 & 0,93 & 0,67 & 0,92 & 0,73 & \num{1527} \\
+Cuerpos de agua                 & 0,75 & 0,63 & 0,93 & 0,58 & 0,92 & 0,49 & 313  \\
+Tierras eriales                 & 0,01 & 0,01 & 0,10 & 0,32 & 0,15 & 0,36 & 90   \\
 \midrule
-Promedio macro                  & 0,53 & 0,64 & 0,53 & \num{7338} \\
+F1 promedio macro               & \multicolumn{2}{c}{0,53} & \multicolumn{2}{c}{0,55} & \multicolumn{2}{c}{0,56} & \num{7338} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -677,19 +696,35 @@ Promedio macro                  & 0,53 & 0,64 & 0,53 & \num{7338} \\
 \label{fig:conf_val}
 \end{figure}
 
-Bosques y montes es la única clase que se mantiene firme, con F1 de 0,92. Hay tres clases con problemas
-claros:
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.62\linewidth]{confusion_knn_esc_validacion.png}
+% COLOCAR FIGURA: matriz de confusión del KNN escalado en la validación con el recorte 2, página 14 del PDF
+% "entregaclasificacion - Colab" (salidas/confusion_knn_esc_validacion.png).
+\caption{Matriz de confusión del KNN escalado con las muestras del recorte 2.}
+\label{fig:conf_val_knn}
+\end{figure}
+
+Bosques y montes es la clase que mejor se sostiene con el Random Forest (F1 de 0,92). Con KNN baja su
+\emph{recall} (0,67 y 0,73), porque parte del bosque se va a vegetación herbácea: 405 píxeles en el KNN
+escalado (Figura~\ref{fig:conf_val_knn}). Hay tres clases con problemas claros en los tres modelos:
 \begin{itemize}
-    \item \textbf{Construcciones:} todas sus muestras se reconocen (\emph{recall} 1,00), pero la precisión
-    cae a 0,21. Esto quiere decir que, de cada cinco píxeles que el modelo llamó construcción, solo uno lo
-    era. Las métricas indican que unos 340 píxeles de otras clases se fueron a construcción.
-    \item \textbf{Tierras eriales:} prácticamente no se reconoce (F1 = 0,01).
-    \item \textbf{Cultivos y vegetación herbácea:} cultivos pierde el 45~\% de sus píxeles
-    (\emph{recall} 0,55), y la herbácea tiene precisión de 0,48. Las cuentas cuadran con que buena parte de
-    los cultivos terminó clasificada como herbácea.
+    \item \textbf{Construcciones:} casi todas sus muestras se reconocen (\emph{recall} de 0,98 a 1,00), pero
+    la precisión se queda entre 0,21 y 0,26. De cada cinco píxeles que los modelos llaman construcción,
+    solo uno lo es. La matriz del KNN escalado muestra de dónde vienen los 331 falsos positivos: 160 son
+    de \textbf{cuerpos de agua}, 113 de \textbf{cultivos y parcelas} y 58 de \textbf{tierras eriales}.
+    \item \textbf{Tierras eriales:} con el Random Forest prácticamente no se reconoce (F1 = 0,01). Con KNN
+    escalado mejora un poco (\emph{recall} 0,36), pero más de la mitad de sus píxeles (58 de 90) sigue
+    yéndose a construcción.
+    \item \textbf{Cultivos y vegetación herbácea:} cultivos pierde entre el 42 y el 47~\% de sus píxeles, y
+    la gran mayoría va a parar a herbácea: \num{1205} píxeles en el KNN escalado. Por eso la herbácea tiene
+    \emph{recall} alto y precisión baja (menos de 0,50) en los tres modelos.
 \end{itemize}
-% VERIFICAR en la matriz (pág. 12) de qué clases vienen los falsos positivos de construcción
-% (se espera que sean sobre todo tierras eriales y cultivos/parcelas).
+
+Que 160 píxeles de agua, la mitad de las muestras de esa clase, terminen como construcción tiene sentido al
+ver el mapa: es el agua cargada de sedimentos de los brazos y orillas del río, junto a los playones. Su
+reflectancia en el visible es alta y se parece a la de las superficies claras.
+% Este desglose sale de la matriz del KNN escalado; la del RF (pág. 12) tiene un patrón parecido.
 
 \subsection{Mapas clasificados}
 
@@ -705,12 +740,17 @@ claros:
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.75\linewidth]{mapa_recorte2_rf.png}
-% COLOCAR FIGURA: mapa clasificado del recorte 2 con RF. No quedó en el PDF exportado (se corta en la
-% página 14); tomarlo de salidas/mapa_recorte2_rf.png o hacer el pantallazo en QGIS con
-% clasificacion_recorte2_rf.gpkg.
+% COLOCAR FIGURA: mapa clasificado del recorte 2 con RF (salidas/mapa_recorte2_rf.png, el pantallazo de
+% la salida de Colab con la leyenda).
 \caption{Mapa clasificado del recorte 2 (Random Forest, \texttt{max\_depth=10}).}
 \label{fig:mapa2}
 \end{figure}
+
+En el mapa del recorte 2 se ve bien el corredor del río con sus meandros y lagunas, el mosaico de
+cultivos (amarillo) y vegetación herbácea (verde claro), y los bosques de galería (verde oscuro) siguiendo
+los caños del sur. Los errores también se ven a simple vista. Los playones dentro de los meandros quedaron
+en rojo, como construcciones. Además hay manchas rojas y cafés repartidas entre las parcelas, donde no hay
+ningún centro poblado. Corresponden a nubes, a lotes con el suelo descubierto y a parches de suelo desnudo.
 
 % =====================================================================
 \section{Análisis de resultados}
@@ -861,9 +901,9 @@ Las nubes del recorte 2 salieron clasificadas como construcciones (Figura~\ref{f
 una nube refleja mucho en todas las bandas, y entre las seis clases entrenadas la más brillante es
 construcción. Como no había nubes ni sombras en el recorte 1, ninguna clase las representa, y el modelo las
 asigna a la clase más parecida que conoce. Este error no aparece en las métricas, porque no se tomaron
-muestras sobre nubes, pero sí ensucia el mapa. Las sombras, por ser oscuras, pueden terminar como agua o
-como bosque.
-% REVISAR en el mapa del recorte 2 cómo quedaron las sombras y ajustar la última frase.
+muestras sobre nubes, pero sí ensucia el mapa (Figura~\ref{fig:mapa2}). En el mapa, las sombras se notan
+menos. Al ser zonas oscuras con vegetación debajo, quedan mezcladas con el bosque y la vegetación, y por eso
+es más difícil verlas como error.
 
 \begin{figure}[H]
 \centering
@@ -886,9 +926,10 @@ A esto se suma que el recorte 1 tenía pocas parcelas (708 píxeles) y el recort
 encontró parcelas en otros estados en el recorte 2, muchas las clasificó como herbácea.
 
 \subsection{Cuerpos de agua}
-El río se clasifica sin problema, pero en el recorte 2 el \emph{recall} del agua baja a 0,63. Coincide con
-lo que se notó al muestrear: el agua es fácil de ver en el cauce principal, pero no tanto en algunas
-lagunas, pozos y meandros. Ahí el agua es poco profunda, tiene sedimentos o vegetación, y los píxeles de
+El cauce principal se clasifica bien en los dos mapas, pero en la validación el \emph{recall} del agua queda
+entre 0,49 y 0,63, según el modelo. En el KNN escalado, casi la mitad de los píxeles de agua (160 de 313)
+se fue a construcción. Coincide con lo que se notó al muestrear: el agua es fácil de ver en el cauce
+principal, pero no tanto en algunas lagunas, pozos y meandros. Ahí el agua es poco profunda, tiene sedimentos o vegetación, y los píxeles de
 borde se mezclan con la orilla. Como las muestras de los meandros fueron pequeñas, una parte de sus píxeles
 probablemente ya incluía orilla.
 
@@ -898,6 +939,21 @@ distintas. En el recorte 1, los píxeles de prueba salen de los mismos polígono
 son casi idénticos a ellos, por lo que el resultado es optimista. El recorte 2 tiene otro paisaje, otras
 proporciones de clases, nubes y un error de etiquetado, y muestra mejor cómo se comportaría el modelo en una
 zona nueva. Por eso tenía sentido hacer la segunda validación que pide la consigna.
+
+\subsection{Comparación entre Random Forest y KNN}
+En el recorte 1 los tres modelos quedaron prácticamente empatados. En el recorte 2, el KNN escalado resultó
+el mejor en exactitud y kappa (0,685 y 0,562), seguido por el Random Forest (0,668 y 0,531) y el KNN sin
+escalar (0,642 y 0,503). Ninguno es mejor en todo:
+\begin{itemize}
+    \item El \textbf{Random Forest} conserva mucho mejor los bosques (\emph{recall} 0,90 contra 0,73) y el
+    agua (0,63 contra 0,49), pero casi no reconoce las tierras eriales.
+    \item El \textbf{KNN escalado} es más preciso con los cultivos (0,97) y recupera algo de tierras eriales
+    (0,36). En cambio, confunde más bosque con herbácea.
+\end{itemize}
+Escalar mejoró al KNN en la validación (de 0,642 a 0,685). Aunque todas las bandas están en reflectancia,
+B11 y B12 tienen rangos distintos a los de las bandas del visible, y el \texttt{RobustScaler} equilibra su peso
+en el cálculo de distancias. Con estas muestras, la diferencia entre los modelos es menor que el efecto de
+los problemas de muestreo discutidos antes. Por eso lo primero es mejorar las muestras.
 
 \begin{analisisBox}{Segunda clasificación (en preparación)}
 A partir de lo anterior, se va a realizar una segunda clasificación con estos cambios:
@@ -925,8 +981,9 @@ A partir de lo anterior, se va a realizar una segunda clasificación con estos c
     lectura de Sentinel-2 L2A desde el zip, recortes, muestras, entrenamiento, evaluación y mapas. Solo hubo
     que adaptar el sistema de coordenadas y el orden de las bandas.
     \item Random Forest y KNN dieron prácticamente lo mismo en el recorte de entrenamiento (exactitud cercana
-    a 0,98). En la validación externa, el Random Forest fue un poco mejor (0,668 contra 0,642). La
-    profundidad óptima quedó en 10, sin señales de sobreajuste.
+    a 0,98). En la validación externa, el mejor fue el KNN con datos escalados (0,685, $\kappa$ 0,562), seguido
+    del Random Forest (0,668) y del KNN sin escalar (0,642). El Random Forest fue el que mejor conservó los
+    bosques y el agua. La profundidad óptima del Random Forest quedó en 10, sin señales de sobreajuste.
     \item La validación con un recorte distinto fue clave. Las métricas internas daban casi un modelo
     perfecto, mientras que con muestras independientes la exactitud bajó a 0,67 y el kappa a 0,53. Ahí se
     vieron los problemas reales del modelo.
@@ -1040,5 +1097,9 @@ Archivo & Contenido \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+Los archivos del repositorio están en \url{https://github.com/AlexandraUD/ClasificacionSupervisada}. La
+escena Sentinel-2 y el cuaderno de Colab están en Google Drive (enlaces en la Sección~\ref{sec:datos}). La
+carpeta \texttt{salidas/} se genera en el Drive de quien ejecute el script.
 
 \end{document}
