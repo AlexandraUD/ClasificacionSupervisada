@@ -309,23 +309,58 @@ def color_clase(clase):
     return COLORES_CLASE.get(clase, plt.cm.tab10(clase % 10))
 
 
-def graficar_firmas_espectrales(df, dict_clases, nombre_png):
-    """Firmas espectrales medias +- desvío por clase (Notebook 03a, 1.1)."""
-    plt.figure(figsize=(8, 6))
-    for clase, nombre in dict_clases.items():
-        sub = df.loc[df["Clase"] == clase, COLUMNAS_BANDAS]
-        if len(sub) > 0:
+def graficar_firmas_espectrales(dfs, dict_clases, nombre_png):
+    """Firmas espectrales medias +- desvío por clase (Notebook 03a, 1.1).
+
+    dfs: {título: DataFrame de muestras}. Se hace un panel por cada DataFrame (todas sus muestras),
+    con el mismo eje Y para poder comparar el recorte 1 con el recorte 2.
+    """
+    fig, axes = plt.subplots(1, len(dfs), figsize=(7.5 * len(dfs), 6), sharey=True, squeeze=False)
+    etiquetas_x = [f"{b}\n{int(w)}" for b, w in zip(BANDAS, LONGITUDES_ONDA_NM)]
+    for ax, (titulo, df) in zip(axes[0], dfs.items()):
+        for clase, nombre in dict_clases.items():
+            sub = df.loc[df["Clase"] == clase, COLUMNAS_BANDAS]
+            if len(sub) == 0:
+                continue
             media = sub.mean().values
             desvio = sub.std().fillna(0).values
-            plt.plot(LONGITUDES_ONDA_NM, media, "o-", label=nombre, color=color_clase(clase))
-            plt.fill_between(LONGITUDES_ONDA_NM, media - desvio, media + desvio,
-                             color=color_clase(clase), alpha=0.3)
-    plt.xlabel("Longitud de onda (nm)")
-    plt.ylabel("Valor promedio de la banda")
-    plt.title("Patrones espectrales de las clases")
-    plt.legend()
-    plt.grid(True)
+            ax.plot(LONGITUDES_ONDA_NM, media, "o-", lw=2, ms=5, color=color_clase(clase))
+            ax.fill_between(LONGITUDES_ONDA_NM, media - desvio, media + desvio,
+                            color=color_clase(clase), alpha=0.12)
+        ax.set_xticks(LONGITUDES_ONDA_NM)
+        ax.set_xticklabels(etiquetas_x, fontsize=9)
+        ax.set_xlabel("Banda y longitud de onda central (nm)")
+        ax.set_title(f"{titulo} ({len(df):,} píxeles)".replace(",", " "))
+        ax.grid(True, alpha=0.4)
+    axes[0][0].set_ylabel("Reflectancia media (valor de la banda)")
+    fig.suptitle("Firmas espectrales por clase (media; banda = ± 1 desvío estándar)", fontsize=13)
+    fig.legend(handles=[plt.Line2D([0], [0], color=color_clase(c), lw=3, marker="o", label=n)
+                        for c, n in dict_clases.items()],
+               loc="lower center", ncol=3, frameon=False, bbox_to_anchor=(0.5, -0.06))
     guardar_figura(nombre_png)
+
+
+def graficar_pairplot(df, dict_clases, titulo, nombre_png, max_por_clase=300):
+    """Dispersión entre pares de bandas con igual cantidad máxima de píxeles por clase (03a, 1.1).
+
+    Con una muestra al azar simple, las clases grandes tapan a las pequeñas; por eso se toman hasta
+    'max_por_clase' píxeles de cada clase.
+    """
+    nombres_banda = {c: f"{b} ({int(w)} nm)" for c, b, w in zip(COLUMNAS_BANDAS, BANDAS, LONGITUDES_ONDA_NM)}
+    partes = [g.sample(min(max_por_clase, len(g)), random_state=SEMILLA)
+              for _, g in df.groupby("Clase")]
+    sub = pd.concat(partes)[COLUMNAS_BANDAS + ["DESC"]].rename(columns=nombres_banda)
+    paleta = {desc: color_clase(c) for c, desc in dict_clases.items()}
+    orden = [dict_clases[c] for c in sorted(dict_clases) if dict_clases[c] in set(sub["DESC"])]
+    g = sns.pairplot(sub, hue="DESC", hue_order=orden, palette=paleta, corner=True,
+                     diag_kind="kde", height=1.9,
+                     plot_kws={"alpha": 0.5, "s": 14, "edgecolor": "none"},
+                     diag_kws={"common_norm": False, "fill": True, "alpha": 0.25})
+    sns.move_legend(g, "upper right", bbox_to_anchor=(0.97, 0.97), title="Clase", frameon=True)
+    g.figure.suptitle(f"{titulo} (hasta {max_por_clase} píxeles por clase)", y=1.01, fontsize=13)
+    plt.savefig(os.path.join(SALIDAS, nombre_png), dpi=150, bbox_inches="tight")
+    plt.show()
+    plt.close()
 
 
 def graficar_recorte_con_poligonos(ruta_tif, poligonos, titulo, nombre_png):
@@ -561,12 +596,13 @@ def main():
     print("\nMuestras recorte 2 por clase:")
     print(muestras2.groupby(["Clase", "DESC"]).size().to_string())
 
-    graficar_firmas_espectrales(muestras1, dict_clases, "firmas_espectrales_recorte1.png")
-    # Dispersión entre pares de bandas (Notebook 03a); se usa una submuestra para que sea rápido
-    sub = muestras1[COLUMNAS_BANDAS + ["DESC"]].sample(min(3000, len(muestras1)), random_state=SEMILLA)
-    paleta = {desc: color_clase(c) for c, desc in dict_clases.items()}
-    sns.pairplot(sub, hue="DESC", palette=paleta, plot_kws={"alpha": 0.4, "s": 10})
-    guardar_figura("pairplot_recorte1.png")
+    # Firmas con TODAS las muestras de cada recorte (un panel por recorte, mismo eje Y)
+    graficar_firmas_espectrales({"Recorte 1 (entrenamiento)": muestras1,
+                                 "Recorte 2 (validación)": muestras2},
+                                dict_clases, "firmas_espectrales.png")
+    # Dispersión entre pares de bandas de las muestras de entrenamiento, balanceada por clase
+    graficar_pairplot(muestras1, dict_clases, "Dispersión entre bandas - recorte 1",
+                      "pairplot_recorte1.png")
 
     graficar_recorte_con_poligonos(tif1, pols1, "Recorte 1 con polígonos de muestras",
                                    "poligonos_recorte1.png")
