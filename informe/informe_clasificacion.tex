@@ -102,18 +102,18 @@
 
 \begin{abstract}
 \noindent
-En este trabajo se clasificó la cobertura de la tierra de una escena Sentinel-2 L2A del 9 de enero de 2025
+En este trabajo se clasificó la cobertura de la tierra de en dos zonas de una Sentinel-2 con corrección atmosfésrica cL2A del 9 de enero de 2025
 (tesela T19NBH) en el departamento de Arauca, Colombia. Se usaron las bandas B02, B03, B04, B08, B11 y B12
-a 10~m y seis clases del primer nivel del sistema CIAF: construcciones, cultivos y parcelas, vegetación herbácea
+a 10~m y seis clases del primer nivel del sistema CIAF (Centro de Investigación y Desarrollo en Información Geográfica): construcciones, cultivos y parcelas, vegetación herbácea
 descubierta, bosques y montes, cuerpos de agua y tierras eriales. Las muestras se digitalizaron en QGIS sobre
-dos recortes de $5\times5$~km. Con ellas se entrenó un Random Forest, se buscó la profundidad máxima por
+dos recortes de $5\times5$~km. Con ellas se entrenó un modelo Random Forest, se buscó la profundidad máxima por
 validación cruzada y, a modo de comparación, se probó un KNN con y sin escalado. Sobre el recorte de
 entrenamiento la exactitud global del Random Forest fue de \num{0.979} ($\kappa=\num{0.972}$). Al validar con
 el segundo recorte, que tiene muestras independientes, bajó a \num{0.668} ($\kappa=\num{0.531}$). En esa
 validación el mejor modelo fue el KNN escalado, con \num{0.685} ($\kappa=\num{0.562}$). La diferencia se explica sobre todo por tres cosas:
 los suelos descubiertos y brillantes (playones, parcelas aradas) terminan clasificados como construcción, los
 cultivos se confunden con la vegetación herbácea, y en el segundo recorte hay nubes y sombras que no hacían
-parte del entrenamiento. Al final se plantean los ajustes para una segunda clasificación.
+parte del entrenamiento. Se plantean los ajustes para una segunda clasificación y de allí se obtiene que xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.
 \end{abstract}
 
 \tableofcontents
@@ -123,14 +123,14 @@ parte del entrenamiento. Al final se plantean los ajustes para una segunda clasi
 \section{Introducción}
 % =====================================================================
 
-Conocer cómo está cubierto el territorio (dónde hay bosque, dónde se cultiva, por dónde corre el agua, qué
-tanto ha crecido lo urbano) es la base para casi cualquier decisión de ordenamiento o de gestión ambiental.
+Conocer las coberturas como la densidad del bosque, dónde se cultiva, por dónde corre el agua, qué
+tanto ha crecido lo urbano es la base para casi cualquier decisión de ordenamiento o de gestión ambiental.
 Hacer ese levantamiento en campo es costoso y lento, por eso desde hace décadas se recurre a las imágenes
 satelitales. Cada tipo de superficie refleja la energía de una manera distinta a lo largo del espectro
 electromagnético, y esa \emph{firma espectral} es la que permite separarlas de forma automática
 \citep{chuvieco2010}.
 
-La clasificación supervisada aprovecha justamente eso: a partir de un conjunto de píxeles de los que ya se
+La clasificación supervisada aprovecha que a partir de un conjunto de píxeles de los que ya se
 conoce la clase (las muestras de entrenamiento), un algoritmo aprende a asignar una clase al resto de la
 imagen \citep{gulich}. Uno de los algoritmos más usados en teledetección es Random Forest, que combina
 muchos árboles de decisión y suele dar buenos resultados sin necesidad de normalizar los datos
@@ -141,8 +141,7 @@ Es una zona de sabanas inundables, bosques de galería, ríos con meandros, potr
 casco urbano de Arauca sobre el río del mismo nombre. Esa mezcla la hace interesante para clasificar, pero
 también difícil, porque varias coberturas tienen respuestas espectrales parecidas. El flujo de trabajo sigue
 las Notebooks 02c, 03a y 03b del curso: lectura de las bandas, generación de muestras, entrenamiento,
-evaluación y, como segunda instancia de validación, la aplicación del modelo sobre un recorte distinto con
-muestras propias (apartado ``Yapa'' de la Notebook 03b).
+evaluación y, como segunda instancia de validación, la aplicación del modelo sobre un recorte distinto con muestras propias.
 
 % =====================================================================
 \section{Objetivos}
@@ -173,8 +172,8 @@ cuando se aplica a una zona distinta de aquella en la que fue entrenado.
 % =====================================================================
 
 \subsection{Imágenes satelitales y firmas espectrales}
-Una imagen satelital es una medición por teledetección: un instrumento a bordo del satélite registra la
-energía reflejada o emitida por la superficie en determinadas regiones del espectro electromagnético, y
+Una imagen satelital se obtiene por técnicas de teledetección, generalmente con un instrumento a bordo de un satélite que registra la
+energía del sol reflejada o emitida por la superficie en determinadas regiones del espectro electromagnético, y
 cada píxel queda localizado geográficamente \citep{gulich}. Los sensores multiespectrales no miden el
 espectro completo, sino ``recortes'' de él, que se conocen como bandas espectrales.
 
@@ -195,12 +194,11 @@ bastante conocidos \citep{gulich}:
     el espectro, mientras que el suelo húmedo absorbe más en el NIR y el SWIR.
 \end{itemize}
 
-Para la interpretación visual se usan composiciones RGB. Además del color natural (B04-B03-B02), en este
-trabajo fue muy útil el \textbf{falso color de vegetación} (B08-B04-B03). Ahí la vegetación vigorosa
+Para la interpretación visual se usan composiciones RGB como el color natural (B04-B03-B02) y el \textbf{falso color de vegetación} (B08-B04-B03), donde la vegetación vigorosa
 aparece en rojo, el agua en tonos oscuros o azules, y las superficies construidas y los suelos descubiertos
 en tonos cian o grisáceos.
 
-\subsection{La misión Sentinel-2}
+\subsection{Misión Sentinel-2}
 Sentinel-2 es una misión del programa Copernicus de la Agencia Espacial Europea (ESA). Lleva el instrumento
 multiespectral MSI, con 13 bandas entre el visible y el SWIR y resoluciones de 10, 20 y 60~m
 \citep{drusch2012,esa2015}. El producto \textbf{L2A} viene corregido atmosféricamente y expresa los
@@ -275,10 +273,10 @@ sí (están autocorrelacionados), y las métricas tienden a ser optimistas. Por 
 validación con un recorte distinto y muestras independientes.
 
 \subsection{Sistema de clasificación CIAF}
-Para definir las clases se tomó como referencia el sistema de categorías del Centro de Investigación en
-Percepción Remota (CIAF), que organiza la cobertura y el uso de la tierra en cuatro niveles de detalle
-\citep{ciaf}. Se trabajó con el primer nivel (exploratorio), que tiene seis categorías y es coherente con lo
-que se puede distinguir en una imagen de 10~m sin trabajo de campo.
+
+Para definir las clases se tomó como referencia el sistema de categorías del CIAF (Centro Interamericano de Fotointerpretación), una institución colombiana vinculada al Instituto Geográfico Agustín Codazzi (IGAC) que cambió de nombre con el tiempo y hoy ya no existe como tal. Su clasificación no nació de las imágenes digitales sino de la fotointerpretación: se basó en una metodología de análisis fisiográfico, en la que el terreno se divide en unidades según su forma, textura y tono en fotografías aéreas, y en el enfoque del ITC (Países Bajos). Por eso sus categorías están pensadas para un intérprete humano que ve el paisaje y no solo el color de un píxel.
+
+El sistema organiza la cobertura y el uso de la tierra en cuatro niveles de detalle: exploratorio, de reconocimiento, semidetallado y detallado, donde cada nivel subdivide al anterior \citep{ciaf}. Se trabajó con el primer nivel, que tiene seis categorías (construcciones, cultivos y parcelas, vegetación herbácea descubierta, bosques y montes, cuerpos de agua y tierras eriales), porque es el más coherente con lo que se puede distinguir en una imagen de 10~m sin trabajo de campo. Al aplicarlo a una clasificación automática píxel a píxel se pierden criterios que usa el intérprete, como la forma de los lotes o la textura del bosque, y eso se refleja en las confusiones entre clases del análisis de resultados.
 
 % =====================================================================
 \section{Área de estudio y datos}
@@ -286,19 +284,17 @@ que se puede distinguir en una imagen de 10~m sin trabajo de campo.
 % =====================================================================
 
 \subsection{Imagen Sentinel-2}
-La imagen se descargó del Copernicus Browser \citep{copernicus}, filtrando por productos Sentinel-2 L2A:
-\begin{center}
-\small \url{https://browser.dataspace.copernicus.eu/?zoom=9&lat=7.2535&lng=-70.83984&themeId=DEFAULT-THEME&visualizationUrl=U2FsdGVkX19Bm\%2FbBYkLNpBX9pPZuAU1EZTmibP5ORrWV76CQCauUWJ5zDuKukkfUZO70\%2FuZejP4VpSQgBXFYHl18\%2BXOfRjUAsMpW8aOgYo8cukIgA7rZD6oIG6C\%2B6Y2w&datasetId=S2_L2A_CDAS}
-\end{center}
+La imagen se descargó del Copernicus Browser \citep{copernicus}, filtrando por productos Sentinel-2 L2A.
 
 \begin{table}[H]
 \centering
 \caption{Datos de la escena utilizada.}
 \label{tab:escena}
-\small
-\begin{tabular}{@{}ll@{}}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lp{9cm}@{}}
 \toprule
-Producto & \texttt{S2A\_MSIL2A\_20250109T151721\_N0511\_R125\_T19NBH\_20250109T183248} \\
+Producto & \texttt{\scriptsize S2A\_MSIL2A\_20250109T151721\_N0511\_R125\_T19NBH\_20250109T183248} \\
 Satélite & Sentinel-2A \\
 Nivel de procesamiento & L2A (reflectancia de superficie) \\
 Fecha de adquisición & 9 de enero de 2025 \\
@@ -322,27 +318,20 @@ Para poder reproducir el trabajo, los insumos quedaron disponibles en línea:
     El script la descarga solo con \texttt{gdown} si no la encuentra en la carpeta de trabajo.
     \item \textbf{Cuaderno de Google Colab con la ejecución:}
     \url{https://colab.research.google.com/drive/1fWRmWLi8-Nx8rE_cn-RFM_4ckKovzE4d?usp=drive_link}.
-    \item \textbf{Repositorio en GitHub} (script, vectores de recortes y muestras, simbología, salida de
+    \item \textbf{Repositorio en GitHub} (script "entregaclasificacion.py", vectores de recortes y muestras, simbología, salida de
     Colab e informe): \url{https://github.com/AlexandraUD/ClasificacionSupervisada}.
-    \item \textbf{Script:}
-    \url{https://github.com/AlexandraUD/ClasificacionSupervisada/blob/main/entregaclasificacion.py}.
+    
 \end{itemize}
 % Revisar que el zip y el Colab estén compartidos como "Cualquier persona con el enlace".
 
 \subsection{Recortes}
 Se trabajó con dos recortes cuadrados de $5\times5$~km ($500\times500$ píxeles), dibujados en QGIS como
 polígonos (\texttt{recorte1.gpkg} y \texttt{recorte2.gpkg}). Están separados unos 80~km entre sí y tienen
-paisajes distintos a propósito:
-
-\begin{itemize}
-    \item \textbf{Recorte 1 (entrenamiento):} centrado aproximadamente en $7{,}077^\circ$N,
+paisajes distintos, el Recorte 1 (entrenamiento): centrado aproximadamente en $7{,}077^\circ$N,
     $70{,}764^\circ$W. Incluye el casco urbano de Arauca, el aeropuerto, el río con sus meandros, lagunas,
-    bosques y algo de potreros. Hay pocas parcelas agrícolas.
-    \item \textbf{Recorte 2 (validación):} centrado aproximadamente en $6{,}694^\circ$N,
+    bosques y algo de potreros. Hay pocas parcelas agrícolas y el Recorte 2 (validación): centrado aproximadamente en $6{,}694^\circ$N,
     $71{,}381^\circ$W. Es un sector rural alrededor de un río, dominado por parcelas, sin centro poblado
     y con algunas nubes y sombras.
-    % VERIFICAR: nombre del municipio y del río del recorte 2.
-\end{itemize}
 
 \begin{figure}[H]
 \centering
@@ -356,7 +345,8 @@ paisajes distintos a propósito:
     \includegraphics[width=\linewidth]{vista_recorte2.png}
     \caption{Recorte 2 (validación).}
 \end{subfigure}
-% COLOCAR FIGURA: las dos vistas en color natural de los recortes (salidas/vista_recorte1.png y salidas/vista_recorte2.png).
+% COLOCAR FIGURA: las dos vistas en color natural de los recortes, que están en la página 3 del PDF
+% "entregaclasificacion - Colab" (también en salidas/vista_recorte1.png y salidas/vista_recorte2.png).
 \caption{Recortes en color natural (B04-B03-B02).}
 \label{fig:recortes}
 \end{figure}
@@ -408,26 +398,31 @@ Con respecto a la notebook se hicieron tres cambios:
 \begin{enumerate}
     \item Las bandas se devuelven siempre en el orden pedido (B02, B03, B04, B08, B11, B12) y no en el orden
     en que aparecen dentro del zip.
-    \item El polígono de recorte se reproyecta al CRS de la imagen. En la notebook el CRS estaba escrito a
-    mano para Córdoba (UTM 20S), y aquí la escena está en UTM 19N.
-    \item B11 y B12 se leen a 20~m y se remuestrean a 10~m de forma bilineal sobre la misma ventana del
+    \item El polígono de recorte se reproyecta al CRS, aquí la escena está en UTM 19N.
+    \item Las capas B11 y B12 se leen a 20~m y se remuestrean a 10~m de forma bilineal sobre la misma ventana del
     recorte. Así los dos bloques quedan con exactamente el mismo tamaño y se pueden concatenar.
 \end{enumerate}
-Cada recorte se guardó como un GeoTIFF de seis bandas (\texttt{s2\_recorte1.tif} y
-\texttt{s2\_recorte2.tif}), con valor \emph{nodata} igual a 0.
 
 \subsection{Definición de clases y toma de muestras}
 Se usaron las seis categorías del primer nivel CIAF. La Tabla~\ref{tab:clases} resume cómo se reconoció
 cada una al digitalizar. Se trabajó sobre todo en falso color de vegetación (B08-B04-B03) y se comprobó en
 color natural.
 
+En cada recorte se dibujó una capa de polígonos rectangulares (\texttt{muestras\_recorte1.gpkg} y
+\texttt{muestras\_recorte2.gpkg}) con los atributos \texttt{Clase} (entero) y \texttt{DESC} (texto). Se
+buscó que cada rectángulo quedara dentro de una sola cobertura y lejos de los bordes, para no meter píxeles
+mezclados. En el agua esto fue más difícil en los meandros angostos, donde los rectángulos tuvieron que ser
+pequeños. Las muestras del recorte 2 se tomaron de forma independiente, sin reutilizar ningún polígono del
+recorte 1 y también se destaca que en el recorte 2 había nubes y sombras, pero en el recorte 1 no, y como el modelo solo puede reconocer las clases con las que fue entrenado, se decidió no muestrearlas.
+
 \begin{table}[H]
 \centering
 \caption{Clases utilizadas (nivel 1 CIAF) y criterio de interpretación visual.}
 \label{tab:clases}
-\small
-\renewcommand{\arraystretch}{1.25}
-\begin{tabular}{@{}cp{4.2cm}p{9.6cm}@{}}
+\footnotesize
+\renewcommand{\arraystretch}{1.1}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}cp{3.2cm}p{8cm}@{}}
 \toprule
 \texttt{Clase} & \texttt{DESC} & Criterio en la imagen \\
 \midrule
@@ -441,39 +436,33 @@ color natural.
 \end{tabular}
 \end{table}
 
-En cada recorte se dibujó una capa de polígonos rectangulares (\texttt{muestras\_recorte1.gpkg} y
-\texttt{muestras\_recorte2.gpkg}) con los atributos \texttt{Clase} (entero) y \texttt{DESC} (texto). Se
-buscó que cada rectángulo quedara dentro de una sola cobertura y lejos de los bordes, para no meter píxeles
-mezclados. En el agua esto fue más difícil en los meandros angostos, donde los rectángulos tuvieron que ser
-pequeños. Las muestras del recorte 2 se tomaron de forma independiente, sin reutilizar ningún polígono del
-recorte 1.
-
-En el recorte 2 había nubes y sombras, pero en el recorte 1 no. Como el modelo solo puede reconocer las
-clases con las que fue entrenado, se decidió no muestrearlas.
-
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.9\linewidth]{muestras_qgis_recorte1.png}
-% COLOCAR FIGURA: pantallazo de QGIS con las muestras del recorte 1 sobre la imagen en color natural y la
-% tabla de atributos abierta (Clase / DESC), como el que se usó al revisar las 27 primeras muestras.
+
 \caption{Digitalización de las muestras del recorte 1 en QGIS. Los colores siguen la simbología de la Tabla~\ref{tab:clases}.}
 \label{fig:qgis}
 \end{figure}
-
-% COLOCAR FIGURA (opcional): pantallazo de QGIS con las muestras del recorte 2.
 
 Los polígonos se convirtieron en píxeles con la función \texttt{extraer\_muestras()} de la Notebook 03a.
 La función aplica \texttt{mask} con cada polígono y descarta los píxeles de relleno (65535) y los de
 \emph{nodata} (0). La Tabla~\ref{tab:muestras} muestra cuántos píxeles quedaron por clase.
 
+\vspace{0.2cm}
+Las proporciones de los dos recortes reflejan lo que hay en cada paisaje. En el recorte 1 domina lo urbano y
+en el recorte 2 las parcelas. La clase más débil es tierras eriales, con apenas 84 píxeles en el recorte de
+entrenamiento (1,6~\% del total).
+
 \begin{table}[H]
 \centering
 \caption{Píxeles de muestra por clase en cada recorte.}
 \label{tab:muestras}
-\small
+\footnotesize
+\renewcommand{\arraystretch}{1.1}
+\setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}lrr@{}}
 \toprule
-Clase & Recorte 1 (entrenamiento) & Recorte 2 (validación) \\
+Clase & Recorte 1 (entren.) & Recorte 2 (valid.) \\
 \midrule
 Construcciones                  & \num{1814} & \num{92}   \\
 Cultivos y parcelas             & \num{708}  & \num{3572} \\
@@ -487,9 +476,13 @@ Total                           & \num{5288} & \num{7338} \\
 \end{tabular}
 \end{table}
 
-Las proporciones de los dos recortes reflejan lo que hay en cada paisaje. En el recorte 1 domina lo urbano y
-en el recorte 2 las parcelas. La clase más débil es tierras eriales, con apenas 84 píxeles en el recorte de
-entrenamiento (1,6~\% del total).
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\linewidth]{muestras_qgis_recorte2.png}
+
+\caption{Digitalización de las muestras del recorte 2 en QGIS.}
+\label{fig:qgis2}
+\end{figure}
 
 \subsection{Análisis de separabilidad}
 Antes de entrenar se revisaron las firmas espectrales medias de cada clase (con $\pm$ una desviación
@@ -1068,10 +1061,9 @@ A partir de lo anterior, se va a realizar una segunda clasificación con estos c
 Breiman, L. (2001). Random forests. \textit{Machine Learning}, 45(1), 5--32.
 
 \bibitem[{CIAF}(s.f.)]{ciaf}
-Centro de Investigación en Percepción Remota (CIAF) (s.f.). \textit{Categorías de cobertura y uso de la
-tierra por nivel de detalle}. Instituto Geográfico Agustín Codazzi. Material de clase, Universidad
-Distrital Francisco José de Caldas.
-% COMPLETAR: referencia exacta del documento CIAF que les dieron en clase.
+Centro Interamericano de Fotointerpretación (CIAF) (s.f.). \textit{Sistema de categorías de cobertura y
+uso de la tierra por niveles de detalle}. Instituto Geográfico Agustín Codazzi (IGAC), Colombia.
+% COMPLETAR (opcional): año o datos de publicación, si aparecen en el documento de clase.
 
 \bibitem[Chuvieco(2010)]{chuvieco2010}
 Chuvieco, E. (2010). \textit{Teledetección ambiental: la observación de la Tierra desde el espacio}
