@@ -356,8 +356,7 @@ paisajes distintos a propósito:
     \includegraphics[width=\linewidth]{vista_recorte2.png}
     \caption{Recorte 2 (validación).}
 \end{subfigure}
-% COLOCAR FIGURA: las dos vistas en color natural de los recortes, que están en la página 3 del PDF
-% "entregaclasificacion - Colab" (también en salidas/vista_recorte1.png y salidas/vista_recorte2.png).
+% COLOCAR FIGURA: las dos vistas en color natural de los recortes (salidas/vista_recorte1.png y salidas/vista_recorte2.png).
 \caption{Recortes en color natural (B04-B03-B02).}
 \label{fig:recortes}
 \end{figure}
@@ -493,32 +492,53 @@ en el recorte 2 las parcelas. La clase más débil es tierras eriales, con apena
 entrenamiento (1,6~\% del total).
 
 \subsection{Análisis de separabilidad}
-Antes de entrenar se graficaron las firmas espectrales medias de cada clase (con $\pm$ una desviación
-estándar) y un \emph{pairplot} con la dispersión entre pares de bandas.
+Antes de entrenar se revisaron las firmas espectrales medias de cada clase (con $\pm$ una desviación
+estándar), usando todas las muestras de cada recorte, y un \emph{pairplot} con la dispersión entre pares de
+bandas de las muestras de entrenamiento. En el \emph{pairplot} se toman hasta 300 píxeles por clase, para
+que las clases grandes (como construcciones) no tapen a las pequeñas.
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.7\linewidth]{firmas_espectrales_recorte1.png}
-% COLOCAR FIGURA: firmas espectrales del recorte 1, página 4 del PDF "entregaclasificacion - Colab"
-% (salidas/firmas_espectrales_recorte1.png).
-\caption{Firmas espectrales medias por clase en el recorte 1.}
+\includegraphics[width=\linewidth]{firmas_espectrales.png}
+% COLOCAR FIGURA: firmas espectrales con los dos paneles (salidas/firmas_espectrales.png).
+\caption{Firmas espectrales medias por clase ($\pm$ una desviación estándar), con todas las muestras del recorte 1 (izquierda) y del recorte 2 (derecha).}
 \label{fig:firmas}
 \end{figure}
 
+En el recorte 1 (panel izquierdo de la Figura~\ref{fig:firmas}) las firmas se comportan como se esperaba:
+\begin{itemize}
+    \item El \textbf{agua} es la más baja en el NIR (alrededor de 2100) y en el SWIR (alrededor de 1300 en B11
+    y 1200 en B12).
+    \item \textbf{Bosques} y \textbf{vegetación herbácea} tienen el salto típico entre el rojo y el NIR (de
+    alrededor de 1300 a casi 4000) y valores bajos en el SWIR. Son las dos clases más parecidas entre sí: sus
+    curvas casi se superponen, con la herbácea apenas más alta en el NIR y en el SWIR.
+    \item \textbf{Construcciones} es la clase más brillante en el visible y en el SWIR. \textbf{Tierras
+    eriales} tiene un visible bajo, cercano al de la vegetación, pero un SWIR alto: en el NIR y en B11 queda
+    casi igual que construcciones, y se diferencia sobre todo en el visible y en B12 (alrededor de 2700
+    contra 3850).
+    \item \textbf{Cultivos y parcelas} queda en un punto intermedio: un NIR más bajo que el de la vegetación
+    (alrededor de 3100) y un SWIR más alto (alrededor de 3500 en B11).
+\end{itemize}
+El panel derecho muestra que varias de estas firmas cambian bastante en el recorte 2. Eso se discute en la
+Sección~\ref{sec:cambio_firmas}.
+
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.85\linewidth]{pairplot_recorte1.png}
-% COLOCAR FIGURA: pairplot de las seis bandas, páginas 4 y 5 del PDF "entregaclasificacion - Colab"
-% (salidas/pairplot_recorte1.png).
-\caption{Histogramas y dispersión entre pares de bandas para las muestras del recorte 1.}
+\includegraphics[width=0.95\linewidth]{pairplot_recorte1.png}
+% COLOCAR FIGURA: pairplot de las seis bandas (salidas/pairplot_recorte1.png). Si el pantallazo sale
+% partido en dos, usar el archivo PNG que genera el script.
+\caption{Dispersión entre pares de bandas y densidad de cada banda por clase, con hasta 300 píxeles por clase del recorte 1.}
 \label{fig:pairplot}
 \end{figure}
 
-Las firmas se comportan como se esperaba. El agua es la más baja en el NIR y el SWIR. Los bosques tienen el
-salto típico entre el rojo y el NIR, y valores bajos en el SWIR. La vegetación herbácea y los cultivos se
-parecen bastante entre sí, y por eso se solapan en el espacio de atributos. Construcciones y tierras
-eriales tienen reflectancias altas en el visible y el SWIR, con una forma de curva parecida.
-% REVISAR contra la Figura de firmas: ajustar esta descripción si alguna clase se ve distinta.
+En el \emph{pairplot} se ve que B02, B03 y B04 están muy correlacionadas entre sí (nubes alargadas sobre una
+diagonal), así que aportan información parecida. Lo mismo ocurre entre B11 y B12, que casi forman una recta.
+Las bandas que más separan las clases son el NIR (B08) y el SWIR (B11 y B12): el agua queda aislada con valores
+bajos y la vegetación se separa de las construcciones. En las bandas del visible, en cambio, bosques,
+herbácea, cultivos y tierras eriales se amontonan en la misma esquina del gráfico. Construcciones y tierras
+eriales se superponen en el plano B08 contra B11. En B08 el agua muestra dos grupos, uno muy oscuro (alrededor
+de 1500) y otro algo más brillante (alrededor de 2300), posiblemente por diferencias de profundidad o
+turbidez entre el río y las lagunas.
 
 \begin{figure}[H]
 \centering
@@ -532,8 +552,7 @@ eriales tienen reflectancias altas en el visible y el SWIR, con una forma de cur
     \includegraphics[width=\linewidth]{poligonos_recorte2.png}
     \caption{Recorte 2.}
 \end{subfigure}
-% COLOCAR FIGURA: polígonos de muestras sobre el falso color, páginas 5 y 6 del PDF
-% "entregaclasificacion - Colab" (salidas/poligonos_recorte1.png y poligonos_recorte2.png).
+% COLOCAR FIGURA: polígonos de muestras sobre el falso color (salidas/poligonos_recorte1.png y poligonos_recorte2.png).
 \caption{Polígonos de muestras sobre cada recorte en falso color (B08-B04-B03).}
 \label{fig:poligonos}
 \end{figure}
@@ -593,8 +612,8 @@ el modelo base, y los dos dan exactamente las mismas métricas.
 \draw[red, dashed] (axis cs:10,0.90) -- (axis cs:10,0.985);
 \end{axis}
 \end{tikzpicture}
-% Figura generada con los valores impresos por el script (página 7 del PDF "entregaclasificacion - Colab").
-% Si se prefiere la del script, usar salidas/rf_exactitud_vs_profundidad.png (páginas 7-8 del PDF).
+% Figura generada con los valores impresos por el script.
+% Si se prefiere la del script, usar salidas/rf_exactitud_vs_profundidad.png.
 \caption{Exactitud de la validación cruzada del Random Forest en función de la profundidad máxima. La línea roja marca la profundidad elegida.}
 \label{fig:profundidad}
 \end{figure}
@@ -631,8 +650,7 @@ Promedio macro                  & 0,98 & 0,96 & 0,97 & \num{1322} \\
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.62\linewidth]{confusion_rf_mejor_test.png}
-% COLOCAR FIGURA: matriz de confusión del RF max_depth=10 en el test del recorte 1, página 8 del PDF
-% "entregaclasificacion - Colab" (salidas/confusion_rf_mejor_test.png).
+% COLOCAR FIGURA: matriz de confusión del RF max_depth=10 en el test del recorte 1 (salidas/confusion_rf_mejor_test.png).
 % Las matrices de KNN (páginas 8-10) pueden ir en un anexo si se quiere.
 \caption{Matriz de confusión del Random Forest en el conjunto de prueba del recorte 1.}
 \label{fig:conf_test}
@@ -690,8 +708,7 @@ F1 promedio macro               & \multicolumn{2}{c}{0,53} & \multicolumn{2}{c}{
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.62\linewidth]{confusion_rf_mejor_validacion.png}
-% COLOCAR FIGURA: matriz de confusión del RF en la validación con el recorte 2, página 12 del PDF
-% "entregaclasificacion - Colab" (salidas/confusion_rf_mejor_validacion.png).
+% COLOCAR FIGURA: matriz de confusión del RF en la validación con el recorte 2 (salidas/confusion_rf_mejor_validacion.png).
 \caption{Matriz de confusión del Random Forest con las muestras del recorte 2.}
 \label{fig:conf_val}
 \end{figure}
@@ -699,40 +716,37 @@ F1 promedio macro               & \multicolumn{2}{c}{0,53} & \multicolumn{2}{c}{
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.62\linewidth]{confusion_knn_esc_validacion.png}
-% COLOCAR FIGURA: matriz de confusión del KNN escalado en la validación con el recorte 2, página 14 del PDF
-% "entregaclasificacion - Colab" (salidas/confusion_knn_esc_validacion.png).
+% COLOCAR FIGURA: matriz de confusión del KNN escalado en la validación con el recorte 2 (salidas/confusion_knn_esc_validacion.png).
 \caption{Matriz de confusión del KNN escalado con las muestras del recorte 2.}
 \label{fig:conf_val_knn}
 \end{figure}
 
 Bosques y montes es la clase que mejor se sostiene con el Random Forest (F1 de 0,92). Con KNN baja su
-\emph{recall} (0,67 y 0,73), porque parte del bosque se va a vegetación herbácea: 405 píxeles en el KNN
-escalado (Figura~\ref{fig:conf_val_knn}). Hay tres clases con problemas claros en los tres modelos:
+\emph{recall} (0,67 y 0,73), porque parte del bosque se va a vegetación herbácea: 150 píxeles en el Random
+Forest (Figura~\ref{fig:conf_val}), 405 en el KNN escalado (Figura~\ref{fig:conf_val_knn}) y 502 en el KNN sin
+escalar. Hay tres clases con problemas claros en los tres modelos:
 \begin{itemize}
     \item \textbf{Construcciones:} casi todas sus muestras se reconocen (\emph{recall} de 0,98 a 1,00), pero
     la precisión se queda entre 0,21 y 0,26. De cada cinco píxeles que los modelos llaman construcción,
-    solo uno lo es. La matriz del KNN escalado muestra de dónde vienen los 331 falsos positivos: 160 son
-    de \textbf{cuerpos de agua}, 113 de \textbf{cultivos y parcelas} y 58 de \textbf{tierras eriales}.
-    \item \textbf{Tierras eriales:} con el Random Forest prácticamente no se reconoce (F1 = 0,01). Con KNN
-    escalado mejora un poco (\emph{recall} 0,36), pero más de la mitad de sus píxeles (58 de 90) sigue
-    yéndose a construcción.
+    solo uno lo es. En el Random Forest, los 344 falsos positivos vienen de \textbf{cultivos y parcelas}
+    (216), \textbf{tierras eriales} (89) y \textbf{cuerpos de agua} (39). En el KNN escalado son 331: 160 de
+    agua, 113 de cultivos y 58 de tierras eriales.
+    \item \textbf{Tierras eriales:} con el Random Forest prácticamente no se reconoce (F1 = 0,01): 89 de sus
+    90 píxeles se clasifican como construcciones. Con KNN escalado mejora un poco (\emph{recall} 0,36), pero
+    58 de los 90 píxeles siguen yéndose a construcción.
     \item \textbf{Cultivos y vegetación herbácea:} cultivos pierde entre el 42 y el 47~\% de sus píxeles, y
-    la gran mayoría va a parar a herbácea: \num{1205} píxeles en el KNN escalado. Por eso la herbácea tiene
+    la gran mayoría va a parar a herbácea: \num{1223} píxeles en el Random Forest y \num{1205} en el KNN
+    escalado. A la vez, entre 73 y 387 píxeles de herbácea se van a cultivos, según el modelo. Por eso la herbácea tiene
     \emph{recall} alto y precisión baja (menos de 0,50) en los tres modelos.
 \end{itemize}
-
-Que 160 píxeles de agua, la mitad de las muestras de esa clase, terminen como construcción tiene sentido al
-ver el mapa: es el agua cargada de sedimentos de los brazos y orillas del río, junto a los playones. Su
-reflectancia en el visible es alta y se parece a la de las superficies claras.
-% Este desglose sale de la matriz del KNN escalado; la del RF (pág. 12) tiene un patrón parecido.
+Las razones de estos errores se discuten en la Sección~\ref{sec:analisis}.
 
 \subsection{Mapas clasificados}
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.75\linewidth]{mapa_recorte1_rf.png}
-% COLOCAR FIGURA: mapa clasificado del recorte 1 con RF, páginas 10 y 11 del PDF
-% "entregaclasificacion - Colab" (salidas/mapa_recorte1_rf.png).
+% COLOCAR FIGURA: mapa clasificado del recorte 1 con RF (salidas/mapa_recorte1_rf.png).
 \caption{Mapa clasificado del recorte 1 (Random Forest, \texttt{max\_depth=10}).}
 \label{fig:mapa1}
 \end{figure}
@@ -746,11 +760,20 @@ reflectancia en el visible es alta y se parece a la de las superficies claras.
 \label{fig:mapa2}
 \end{figure}
 
-En el mapa del recorte 2 se ve bien el corredor del río con sus meandros y lagunas, el mosaico de
-cultivos (amarillo) y vegetación herbácea (verde claro), y los bosques de galería (verde oscuro) siguiendo
-los caños del sur. Los errores también se ven a simple vista. Los playones dentro de los meandros quedaron
-en rojo, como construcciones. Además hay manchas rojas y cafés repartidas entre las parcelas, donde no hay
-ningún centro poblado. Corresponden a nubes, a lotes con el suelo descubierto y a parches de suelo desnudo.
+En el mapa del recorte 1 (Figura~\ref{fig:mapa1}) se distinguen bien el río, las lagunas y los brazos
+antiguos del cauce (azul), con un trazo continuo. La mancha de construcciones (rojo) cubre el casco urbano y
+se extiende hacia el sur, y los bosques (verde oscuro) ocupan buena parte del noroeste y algunos sectores del
+sur. Las tierras eriales (café) aparecen en manchas pequeñas, sobre todo al sur y al este. En la franja de
+contacto entre lo urbano y los potreros se mezclan los amarillos (cultivos) y los verdes claros (herbácea).
+
+En el mapa del recorte 2 (Figura~\ref{fig:mapa2}) se ve bien el corredor del río con sus meandros, el mosaico
+de cultivos (amarillo) y vegetación herbácea (verde claro), y bandas curvas de bosque (verde oscuro) en el
+sur, que siguen antiguos cauces, además de un bloque de bosque al noroeste. Los errores también se ven a
+simple vista. Los playones dentro de los meandros quedaron en rojo, como construcciones. Además hay manchas
+rojas y cafés repartidas entre las parcelas, donde no hay ningún centro poblado. Según lo visto en las
+imágenes, corresponden a nubes, a lotes con el suelo descubierto y a parches de suelo desnudo. La mancha roja
+grande del noroeste parece coincidir con la nube que se ve en el falso color del recorte 2
+(Figura~\ref{fig:poligonos}).
 
 % =====================================================================
 \section{Análisis de resultados}
@@ -760,8 +783,10 @@ ningún centro poblado. Corresponden a nubes, a lotes con el suelo descubierto y
 \subsection{Lo que el modelo clasificó bien}
 En los dos recortes, \textbf{los bosques y la vegetación herbácea descubierta} se ven bien delimitados en
 los mapas. En el caso de los bosques coincide con las métricas: es la clase más estable al pasar de un
-recorte al otro. Tiene sentido, porque su combinación de reflectancia alta en el NIR y baja en el SWIR es
-muy distinta de la de las demás clases.
+recorte al otro. Tiene sentido, porque su firma casi no cambia entre los dos recortes
+(Figura~\ref{fig:firmas}) y su combinación de NIR alto y SWIR bajo la separa de casi todas las demás
+clases. La excepción es la vegetación herbácea, con la que se confunde un poco (Figuras~\ref{fig:conf_val}
+y~\ref{fig:conf_val_knn}).
 
 En el recorte 1, el modelo reconoció como agua \textbf{las lagunas alargadas que acompañan al río}
 (Figura~\ref{fig:lagunas}). No se daba por hecho, porque no todas tenían muestras y algunas tienen
@@ -786,6 +811,33 @@ cortada por los corredores de vegetación.
 \caption{Zona urbana y aeropuerto en el recorte 1: clasificación (izquierda) e imagen en color natural (derecha).}
 \label{fig:urbano}
 \end{figure}
+
+\subsection{Cambio de las firmas entre los recortes}
+\label{sec:cambio_firmas}
+La Figura~\ref{fig:firmas} explica buena parte de los errores de la validación. Al comparar las firmas
+medias de los dos recortes (valores aproximados, leídos de la figura):
+\begin{itemize}
+    \item \textbf{Bosques y montes} casi no cambian: el NIR es de alrededor de 3800 en los dos recortes y el
+    SWIR de alrededor de 2400 a 2600 en B11. Es la clase que mejor se transfirió (F1 de 0,92 con el Random
+    Forest).
+    \item \textbf{Tierras eriales:} en el recorte 1 tienen un visible bajo y un SWIR moderado (B11 alrededor
+    de 3900 y B12 de 2700). En el recorte 2 pasan a ser la curva más alta de todas (B11 alrededor de 5100 y
+    B12 de 4500) y mucho más brillantes en el visible. Es otro tipo de superficie, más parecida a arena o suelo
+    seco expuesto, que cae en la zona que el modelo asocia a construcciones. Por eso 89 de sus 90 píxeles se
+    van a construcciones con el Random Forest.
+    \item \textbf{Cuerpos de agua:} en el recorte 2 el agua es mucho más brillante en el NIR y el SWIR
+    (B08 alrededor de 2650 contra 2100, B11 de 2500 contra 1300 y B12 de 2100 contra 1200). Es coherente con
+    agua poco profunda o con muchos sedimentos, o con muestras que incluyen píxeles de orilla o de banco de
+    arena. El modelo aprendió un agua muy oscura y le cuesta reconocer esta (\emph{recall} de 0,49 a 0,63).
+    \item \textbf{Cultivos y parcelas:} en el recorte 1 tienen un NIR claramente menor que el de la herbácea
+    (alrededor de 3100 contra 4000) y un SWIR más alto, lo que indica que las parcelas muestreadas allí tenían
+    poca cobertura vegetal. En el recorte 2 el NIR de los cultivos sube a alrededor de 4150, muy cerca del de
+    la herbácea (4550), y las dos curvas casi se superponen. Esto explica la confusión entre ambas.
+    \item \textbf{Construcciones:} las 92 muestras del recorte 2 (los supuestos invernaderos) tienen menos
+    brillo en el visible y más NIR que las construcciones urbanas del recorte 1.
+\end{itemize}
+En conjunto, el modelo se entrenó con una versión de cada clase que no es la que predomina en el recorte 2.
+No es tanto un problema del algoritmo como de que las muestras de entrenamiento no cubren esa variabilidad.
 
 \subsection{Suelos descubiertos clasificados como construcción}
 El error más visible está en las superficies con el suelo descubierto: los playones y bancos de arena del
@@ -838,9 +890,10 @@ Hay varias razones que se suman:
     suelo desnudo, así que, ante un píxel brillante, la clase que más votos recibe es construcción. El borde
     café que aparece alrededor de los playones corresponde a los píxeles de transición, más oscuros o más
     húmedos, que se parecen a la única muestra de eriales.
-    \item \textbf{La muestra de eriales no representa toda la variabilidad.} Un parche de suelo en medio de
-    un potrero no responde igual que un banco de arena seca del río. Por eso, en la validación, tierras
-    eriales queda en F1 = 0,01.
+    \item \textbf{La muestra de eriales no representa toda la variabilidad.} La muestra del recorte 1 es un
+    suelo oscuro en el visible, y las tierras eriales del recorte 2 son mucho más brillantes
+    (Sección~\ref{sec:cambio_firmas}). Un parche de suelo en medio de un potrero no responde igual que un
+    banco de arena seca del río. Por eso, en la validación, tierras eriales queda en F1 = 0,01.
 \end{enumerate}
 
 En el recorte 1 se ve el mismo problema en una zona de parcelas (Figura~\ref{fig:parcela1}). Un lote con el
@@ -890,11 +943,13 @@ verificación en campo no se puede confirmar.
 \label{fig:invernadero}
 \end{figure}
 
-Este error de etiquetado ayuda a entender las métricas de construcciones en la validación. De las 92
-muestras de esa clase en el recorte 2, una parte corresponde a esa parcela. El modelo la clasificó como
-construcción, que era la etiqueta que se le había puesto. Así, el \emph{recall} de 1,00 está inflado: el
-modelo y la etiqueta se equivocan en el mismo sentido. Al mismo tiempo, la baja precisión (0,21) muestra que
-el modelo manda a construcción muchas otras superficies brillantes.
+Este error de etiquetado ayuda a entender las métricas de construcciones en la validación. En el recorte 2 no
+hay centro poblado, y las 92 muestras de esa clase (dos polígonos) corresponden a este tipo de zonas. El
+modelo las clasificó como construcción, que era la etiqueta que se les había puesto. Así, el \emph{recall}
+de 0,98 a 1,00 no mide qué tan bien reconoce construcciones urbanas, y además está inflado: el modelo y la
+etiqueta se equivocan en el mismo sentido. Al mismo tiempo, la baja precisión (0,21 a 0,26) muestra que el
+modelo manda a construcción muchas otras superficies brillantes: 344 píxeles de cultivos, tierras eriales y
+agua en el Random Forest.
 
 \subsection{Nubes y sombras}
 Las nubes del recorte 2 salieron clasificadas como construcciones (Figura~\ref{fig:nubes}). Era de esperar:
@@ -917,21 +972,26 @@ es más difícil verlas como error.
 La otra gran fuente de error es la confusión entre \textbf{cultivos y parcelas} y \textbf{vegetación
 herbácea descubierta}. Se veía venir desde la toma de muestras. Los cultivos se identificaron más que todo
 por la forma de las parcelas y por los tonos azulados del suelo preparado, y la herbácea por los tonos
-naranja. Pero un cultivo ya crecido tiene una firma muy parecida a la de un pasto. El clasificador trabaja
+naranja. Pero un cultivo ya crecido tiene una firma muy parecida a la de un pasto, y en el recorte 2 las curvas de
+los cultivos y de la herbácea casi se superponen (Figura~\ref{fig:firmas}). El clasificador trabaja
 píxel a píxel y no ``ve'' la forma del lote, así que pierde justamente el criterio que se usó para
 diferenciarlas.
 
 A esto se suma que el recorte 1 tenía pocas parcelas (708 píxeles) y el recorte 2 está dominado por ellas
-(\num{3572}). El modelo aprendió los cultivos con pocos ejemplos y casi todos del mismo tipo. Cuando
-encontró parcelas en otros estados en el recorte 2, muchas las clasificó como herbácea.
+(\num{3572}). El modelo aprendió los cultivos con pocos ejemplos y casi todos del mismo tipo: lotes con poca
+cobertura vegetal, que en el recorte 1 tienen un NIR mucho más bajo que la herbácea. Cuando encontró parcelas
+verdes en el recorte 2, muchas las clasificó como herbácea.
 
 \subsection{Cuerpos de agua}
 El cauce principal se clasifica bien en los dos mapas, pero en la validación el \emph{recall} del agua queda
 entre 0,49 y 0,63, según el modelo. En el KNN escalado, casi la mitad de los píxeles de agua (160 de 313)
 se fue a construcción. Coincide con lo que se notó al muestrear: el agua es fácil de ver en el cauce
-principal, pero no tanto en algunas lagunas, pozos y meandros. Ahí el agua es poco profunda, tiene sedimentos o vegetación, y los píxeles de
-borde se mezclan con la orilla. Como las muestras de los meandros fueron pequeñas, una parte de sus píxeles
-probablemente ya incluía orilla.
+principal, pero no tanto en algunas lagunas, pozos y meandros. Ahí el agua es poco profunda, tiene sedimentos
+o vegetación, y los píxeles de borde se mezclan con la orilla. Como las muestras de los meandros fueron
+pequeñas, una parte de sus píxeles probablemente ya incluía orilla. Las firmas apuntan en la misma dirección:
+el agua del recorte 2 es bastante más brillante en el NIR y el SWIR que la del recorte 1
+(Sección~\ref{sec:cambio_firmas}), y el modelo aprendió un agua más oscura. Con el Random Forest, los
+errores del agua van sobre todo a cultivos (78 píxeles) y a construcciones (39).
 
 \subsection{Diferencia entre las dos validaciones}
 La caída de 0,98 a 0,67 en la exactitud no significa que la primera evaluación esté mal hecha. Mide cosas
@@ -967,6 +1027,8 @@ A partir de lo anterior, se va a realizar una segunda clasificación con estos c
     cultivo, arado, en barbecho). Si hace falta, se moverá o ampliará el recorte para incluir más lotes.
     \item Tratar las nubes y sombras, ya sea con una clase propia muestreada en ambos recortes o
     enmascarándolas con la capa de clasificación de escena (SCL) que trae el producto L2A.
+    \item Agregar muestras de agua poco profunda o con sedimentos, y de tierras eriales brillantes (bancos de
+    arena), para que el entrenamiento cubra lo que se ve en el recorte 2.
     \item Evaluar si agregar índices como el NDVI y el NDWI como atributos mejora la separación entre
     agua, vegetación y suelo.
 \end{itemize}
@@ -992,8 +1054,9 @@ A partir de lo anterior, se va a realizar una segunda clasificación con estos c
     construcción, de la confusión entre cultivos y vegetación herbácea, y de las nubes, que no estaban en
     el entrenamiento.
     \item Buena parte de esos errores se origina en las muestras más que en el algoritmo: pocos píxeles de
-    tierras eriales, pocas parcelas en el recorte de entrenamiento y una muestra mal interpretada. Por eso
-    la segunda clasificación se enfoca en mejorar las muestras.
+    tierras eriales, pocas parcelas en el recorte de entrenamiento, una muestra mal interpretada y firmas que
+    cambian de un recorte a otro (agua más brillante, tierras eriales más claras y cultivos más verdes en el
+    recorte 2). Por eso la segunda clasificación se enfoca en mejorar las muestras.
     \item Al trabajar píxel a píxel se pierde información que el intérprete sí usa, como la forma de las
     parcelas o la textura del bosque. Ese es un límite de este enfoque para separar cultivos de pastos.
 \end{itemize}
