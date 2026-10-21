@@ -42,6 +42,7 @@ import re
 import shutil
 import sys
 import textwrap
+import time
 import urllib.request
 from zipfile import ZipFile
 
@@ -470,21 +471,28 @@ def montar_drive():
 
 
 def buscar_vector(nombre_base):
-    """Devuelve la ruta de <nombre_base>.gpkg o .shp dentro de CARPETA (o None)."""
+    """Devuelve la ruta de <nombre_base>.gpkg, siempre con la versión más reciente del repo.
+
+    Primero descarga el .gpkg de GitHub y reemplaza la copia de CARPETA (así se usan las muestras
+    recién subidas al repo). Si la descarga falla, usa lo que haya en CARPETA (.gpkg o .shp).
+    """
+    ruta = os.path.join(CARPETA, nombre_base + ".gpkg")
+    temporal = ruta + ".descarga"
+    try:
+        # el parámetro evita que se use una copia vieja guardada en caché
+        urllib.request.urlretrieve(f"{URL_REPO_RAW}{nombre_base}.gpkg?v={int(time.time())}", temporal)
+        shutil.move(temporal, ruta)
+        print(f"Actualizado desde GitHub: {nombre_base}.gpkg")
+        return ruta
+    except Exception:
+        if os.path.exists(temporal):
+            os.remove(temporal)
     for ext in (".gpkg", ".shp"):
         ruta = os.path.join(CARPETA, nombre_base + ext)
         if os.path.exists(ruta):
+            print(f"No se pudo descargar {nombre_base}.gpkg; se usa la copia de {CARPETA}.")
             return ruta
-    # Si no está en la carpeta, intenta bajarlo del repo de GitHub
-    ruta = os.path.join(CARPETA, nombre_base + ".gpkg")
-    try:
-        urllib.request.urlretrieve(URL_REPO_RAW + nombre_base + ".gpkg", ruta)
-        print(f"Descargado desde GitHub: {nombre_base}.gpkg")
-        return ruta
-    except Exception:
-        if os.path.exists(ruta):
-            os.remove(ruta)
-        return None
+    return None
 
 
 def preparar_zip():
